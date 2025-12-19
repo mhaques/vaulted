@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { useAuth } from './contexts/AuthContext'
-import { IconHome, IconSearch, IconTv, IconBookmark, IconPlay, IconSettings, IconX, IconUser, IconChevronLeft, IconChevronRight } from './components/Icons'
+import { useProfile } from './contexts/ProfileContext'
+import { IconHome, IconSearch, IconTv, IconBookmark, IconPlay, IconSettings, IconLock, IconChevronLeft, IconChevronRight } from './components/Icons'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -18,13 +18,7 @@ const navIcons = {
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation()
-  const { user, login, register, logout, loading } = useAuth()
-  const [showAuthModal, setShowAuthModal] = useState(false)
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [authError, setAuthError] = useState('')
-  const [authLoading, setAuthLoading] = useState(false)
+  const { currentProfile, lockProfile } = useProfile()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   const navItems = [
@@ -38,110 +32,11 @@ export function Layout({ children }: LayoutProps) {
 
   const isActive = (path: string) => location.pathname === path
 
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setAuthError('')
-    setAuthLoading(true)
-    try {
-      if (authMode === 'login') {
-        await login(username, password)
-      } else {
-        await register(username, password)
-      }
-      setShowAuthModal(false)
-      setUsername('')
-      setPassword('')
-    } catch (err: any) {
-      setAuthError(err.message || 'Authentication failed')
-    } finally {
-      setAuthLoading(false)
-    }
-  }
-
   const sidebarWidth = sidebarCollapsed ? 'md:w-16' : 'md:w-56'
   const contentOffset = sidebarCollapsed ? 'md:left-16' : 'md:left-56'
 
   return (
     <div className="min-h-screen bg-black text-neutral-100 flex flex-col md:flex-row bg-gradient-animate">
-      {/* Auth Modal */}
-      {showAuthModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="glass w-full max-w-sm rounded-lg p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-white">
-                {authMode === 'login' ? 'Sign In' : 'Create Account'}
-              </h2>
-              <button
-                onClick={() => setShowAuthModal(false)}
-                className="text-neutral-400 hover:text-white"
-              >
-                <IconX size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleAuth} className="space-y-4">
-              <div>
-                <input
-                  type="text"
-                  placeholder="Username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full glass text-white px-4 py-3 rounded focus:outline-none focus:bg-white/10 transition placeholder-neutral-500"
-                  required
-                />
-              </div>
-              <div>
-                <input
-                  type="password"
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full glass text-white px-4 py-3 rounded focus:outline-none focus:bg-white/10 transition placeholder-neutral-500"
-                  required
-                  minLength={4}
-                />
-              </div>
-
-              {authError && (
-                <p className="text-red-400 text-sm">{authError}</p>
-              )}
-
-              <button
-                type="submit"
-                disabled={authLoading}
-                className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded font-medium transition border border-white/10 disabled:opacity-50"
-              >
-                {authLoading ? '...' : authMode === 'login' ? 'Sign In' : 'Create Account'}
-              </button>
-            </form>
-
-            <p className="text-center text-neutral-500 text-sm mt-4">
-              {authMode === 'login' ? (
-                <>
-                  Don't have an account?{' '}
-                  <button
-                    onClick={() => setAuthMode('register')}
-                    className="text-white hover:underline"
-                  >
-                    Sign up
-                  </button>
-                </>
-              ) : (
-                <>
-                  Already have an account?{' '}
-                  <button
-                    onClick={() => setAuthMode('login')}
-                    className="text-white hover:underline"
-                  >
-                    Sign in
-                  </button>
-                </>
-              )}
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Sidebar for desktop/TV */}
       <aside className={`hidden md:flex md:flex-col ${sidebarWidth} bg-black/80 backdrop-blur-xl border-r border-white/5 min-h-screen fixed top-0 left-0 z-20 transition-all duration-300`}>
         <div className="flex items-center justify-between px-4 py-5">
@@ -193,33 +88,23 @@ export function Layout({ children }: LayoutProps) {
           })}
         </nav>
 
-        {/* User section */}
+        {/* Profile section */}
         <div className="px-3 py-4 border-t border-white/5">
-          {loading ? (
-            <div className="h-10 bg-neutral-800 rounded animate-pulse" />
-          ) : user ? (
-            <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
-              {!sidebarCollapsed && <span className="text-sm text-neutral-300 truncate">{user.username}</span>}
-              <button
-                onClick={logout}
-                title={sidebarCollapsed ? 'Sign out' : undefined}
-                className="text-xs text-neutral-500 hover:text-white transition"
-              >
-                {sidebarCollapsed ? <IconUser size={16} /> : 'Sign out'}
-              </button>
-            </div>
-          ) : (
+          <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'} gap-2`}>
+            {!sidebarCollapsed && (
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <span className="text-2xl">{currentProfile?.avatar}</span>
+                <span className="text-sm text-neutral-300 truncate">{currentProfile?.name}</span>
+              </div>
+            )}
             <button
-              onClick={() => {
-                setShowAuthModal(true)
-                setAuthMode('login')
-              }}
-              title={sidebarCollapsed ? 'Sign in' : undefined}
-              className={`text-sm text-neutral-400 hover:text-white transition py-2 ${sidebarCollapsed ? 'w-full text-center' : 'w-full'}`}
+              onClick={lockProfile}
+              title="Lock profile"
+              className={`text-neutral-500 hover:text-white transition p-2 rounded-lg hover:bg-white/5 ${sidebarCollapsed ? 'mx-auto' : ''}`}
             >
-              {sidebarCollapsed ? <IconUser size={18} className="mx-auto" /> : 'Sign in'}
+              <IconLock size={18} />
             </button>
-          )}
+          </div>
         </div>
       </aside>
 
@@ -231,6 +116,13 @@ export function Layout({ children }: LayoutProps) {
             <img src="/logo.svg" alt="Vaulted" className="w-7 h-7" />
             <span className="text-xl font-bold">Vaulted</span>
           </Link>
+          <button
+            onClick={lockProfile}
+            className="text-neutral-500 hover:text-white transition p-2"
+            title="Lock profile"
+          >
+            <IconLock size={20} />
+          </button>
         </header>
 
         {/* Main Content */}
@@ -258,22 +150,6 @@ export function Layout({ children }: LayoutProps) {
             </div>
           </footer>
         </main>
-
-        {/* Sticky Sign In Bar - shows when not logged in */}
-        {!loading && !user && (
-          <div className={`fixed bottom-20 md:bottom-8 left-4 right-4 ${contentOffset} flex justify-center z-30 pointer-events-none transition-all duration-300`}>
-            <button
-              onClick={() => {
-                setShowAuthModal(true)
-                setAuthMode('login')
-              }}
-              className="bg-indigo-600/90 hover:bg-indigo-500 text-white px-6 py-3 rounded-full text-sm font-medium transition shadow-lg shadow-indigo-500/25 flex items-center gap-2 pointer-events-auto backdrop-blur-sm"
-            >
-              <IconUser size={16} />
-              Sign in to sync your watchlist
-            </button>
-          </div>
-        )}
 
         {/* Bottom Navigation for mobile */}
         <nav className="fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-xl border-t border-white/5 flex md:hidden z-20">

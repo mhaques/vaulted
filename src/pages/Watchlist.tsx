@@ -1,42 +1,34 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
-import { getWatchlist, removeFromWatchlist, WatchlistItem } from '../services/api'
+import { useProfile } from '../contexts/ProfileContext'
+import { useProfileStorage, WatchlistItem } from '../hooks/useProfileStorage'
 import { IMG } from '../services/tmdb'
 import { IconX, IconFilm } from '../components/Icons'
 
 export default function Watchlist() {
-  const { user } = useAuth()
+  const { currentProfile } = useProfile()
+  const { getWatchlist, removeFromWatchlist } = useProfileStorage()
   const [items, setItems] = useState<WatchlistItem[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (user) {
-      getWatchlist()
-        .then(setItems)
-        .catch(console.error)
-        .finally(() => setLoading(false))
-    } else {
-      setLoading(false)
+    if (currentProfile) {
+      setItems(getWatchlist())
     }
-  }, [user])
+    setLoading(false)
+  }, [currentProfile])
 
-  const handleRemove = async (mediaType: string, mediaId: number) => {
-    try {
-      await removeFromWatchlist(mediaType, mediaId)
-      setItems(items.filter(item => !(item.media_type === mediaType && item.media_id === mediaId)))
-    } catch (err) {
-      console.error('Failed to remove from watchlist:', err)
-    }
+  const handleRemove = (mediaType: string, mediaId: number) => {
+    removeFromWatchlist(mediaType, mediaId)
+    setItems(items.filter(item => !(item.media_type === mediaType && item.media_id === mediaId)))
   }
 
-  if (!user) {
+  if (!currentProfile) {
     return (
       <div className="w-full max-w-full md:max-w-6xl mx-auto px-2 sm:px-4 md:px-8 py-4 md:py-8">
         <h1 className="text-2xl md:text-3xl font-semibold mb-1 tracking-tight text-white">Watchlist</h1>
         <div className="text-center py-16">
-          <p className="text-neutral-400 mb-4">Sign in to save your watchlist</p>
-          <p className="text-neutral-600 text-sm">Your watchlist will sync across devices</p>
+          <p className="text-neutral-400 mb-4">No profile selected</p>
         </div>
       </div>
     )

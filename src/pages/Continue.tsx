@@ -1,33 +1,35 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
-import { getContinueWatching, clearProgress, ProgressItem } from '../services/api'
+import { useProfile } from '../contexts/ProfileContext'
+import { useProfileStorage, ProgressItem } from '../hooks/useProfileStorage'
 import { IMG } from '../services/tmdb'
 import { IconPlay, IconX } from '../components/Icons'
 
 export default function Continue() {
-  const { user } = useAuth()
+  const { currentProfile } = useProfile()
+  const { getProgress, removeProgress } = useProfileStorage()
   const [items, setItems] = useState<ProgressItem[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (user) {
-      getContinueWatching()
-        .then(setItems)
-        .catch(console.error)
-        .finally(() => setLoading(false))
-    } else {
-      setLoading(false)
+    if (currentProfile) {
+      const progress = getProgress()
+      // Sort by most recently updated
+      const sorted = progress.sort((a, b) => b.updated_at - a.updated_at)
+      setItems(sorted)
     }
-  }, [user])
+    setLoading(false)
+  }, [currentProfile])
 
-  const handleClear = async (mediaType: string, mediaId: number) => {
-    try {
-      await clearProgress(mediaType, mediaId)
-      setItems(items.filter(item => !(item.media_type === mediaType && item.media_id === mediaId)))
-    } catch (err) {
-      console.error('Failed to clear progress:', err)
-    }
+  const handleClear = (mediaType: string, mediaId: number, season?: number, episode?: number) => {
+    removeProgress(mediaType, mediaId, season, episode)
+    setItems(items.filter(item => {
+      if (item.media_type !== mediaType || item.media_id !== mediaId) return true
+      if (season !== undefined && episode !== undefined) {
+        return !(item.season === season && item.episode === episode)
+      }
+      return false
+    }))
   }
 
   const formatTime = (seconds: number) => {
@@ -39,13 +41,12 @@ export default function Continue() {
     return `${mins}m`
   }
 
-  if (!user) {
+  if (!currentProfile) {
     return (
       <div className="w-full max-w-full md:max-w-6xl mx-auto px-2 sm:px-4 md:px-8 py-4 md:py-8">
         <h1 className="text-2xl md:text-3xl font-semibold mb-1 tracking-tight text-white">Continue Watching</h1>
         <div className="text-center py-16">
-          <p className="text-neutral-400 mb-4">Sign in to track your progress</p>
-          <p className="text-neutral-600 text-sm">Your progress will sync across devices</p>
+          <p className="text-neutral-400 mb-4">No profile selected</p>
         </div>
       </div>
     )
@@ -74,9 +75,9 @@ export default function Continue() {
       ) : items.length > 0 ? (
         <div className="space-y-4">
           {items.map((item) => {
-            const progressPercent = item.progress_percent || Math.round((item.progress_seconds / item.duration_seconds) * 100)
+            const progressPercent = Math.round((item.current_time / item.duration) * 100)
             return (
-              <div key={`${item.media_type}-${item.media_id}`} className="group glass rounded overflow-hidden hover:bg-white/10 transition">
+              <div key={`${item.media_type}-${item.media_id}-${item.season || ''}-${item.episode || ''}`} className="group glass rounded overflow-hidden hover:bg-white/10 transition">
                 <Link to={`/title/${item.media_type}/${item.media_id}`} className="flex gap-4 p-4">
                   {/* Thumbnail */}
                   <div className="flex-shrink-0 w-32 h-20 bg-neutral-900 rounded overflow-hidden">
@@ -106,7 +107,7 @@ export default function Continue() {
                         />
                       </div>
                       <p className="text-xs text-neutral-500 mt-1">
-                        {formatTime(item.progress_seconds)} / {formatTime(item.duration_seconds)}
+                        {formatTime(item.current_time)} / {formatTime(item.duration)}
                       </p>
                     </div>
                   </div>
@@ -119,7 +120,7 @@ export default function Continue() {
                   </div>
                 </Link>
                 <button
-                  onClick={() => handleClear(item.media_type, item.media_id)}
+                  onClick={() => handleClear(item.media_type, item.media_id, item.season, item.episode)}
                   className="absolute top-2 right-2 bg-black/80 hover:bg-red-600 text-white p-1.5 rounded opacity-0 group-hover:opacity-100 transition"
                 >
                   <IconX size={14} />

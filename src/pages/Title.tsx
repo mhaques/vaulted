@@ -14,21 +14,22 @@ import {
   type CastMember,
   type MediaItem
 } from '../services/tmdb'
-import { useAuth } from '../contexts/AuthContext'
-import { isInWatchlist, addToWatchlist, removeFromWatchlist, saveProgress, getProgress } from '../services/api'
+import { useProfile } from '../contexts/ProfileContext'
+import { useProfileStorage } from '../hooks/useProfileStorage'
 import { Tooltip } from '../components/Tooltip'
 import { VideoPlayer } from '../components/VideoPlayer'
 import sourceAggregator, { 
   type StreamSource, 
   addToDebrid 
 } from '../services/sources'
-import { IconStar, IconPlay, IconLoader, IconBookmark, IconCheck, IconPlus, IconX, IconDisc } from '../components/Icons'
+import { IconStar, IconPlay, IconLoader, IconCheck, IconPlus, IconX, IconDisc } from '../components/Icons'
 
 type Details = (MovieDetails & { media_type: 'movie' }) | (TVDetails & { media_type: 'tv' })
 
 export default function Title() {
   const { type, id } = useParams<{ type: 'movie' | 'tv'; id: string }>()
-  const { user } = useAuth()
+  const { currentProfile } = useProfile()
+  const { isInWatchlist: checkInWatchlist, getItemProgress, addToWatchlist, removeFromWatchlist, saveProgress } = useProfileStorage()
   const [details, setDetails] = useState<Details | null>(null)
   const [cast, setCast] = useState<CastMember[]>([])
   const [similar, setSimilar] = useState<MediaItem[]>([])
@@ -92,29 +93,29 @@ export default function Title() {
       .catch(() => setImdbId(null))
   }, [type, id])
 
-  // Check watchlist status when user is logged in
+  // Check watchlist status when profile is active
   useEffect(() => {
-    if (user && type && id) {
-      isInWatchlist(type, parseInt(id, 10))
-        .then(setInWatchlist)
-        .catch(() => setInWatchlist(false))
+    if (currentProfile && type && id) {
+      setInWatchlist(checkInWatchlist(type, parseInt(id, 10)))
     } else {
       setInWatchlist(false)
     }
-  }, [user, type, id])
+  }, [currentProfile, type, id, checkInWatchlist])
 
   // Load saved progress
   useEffect(() => {
-    if (user && type && id) {
-      getProgress(type, parseInt(id, 10), type === 'tv' ? selectedSeason : undefined, type === 'tv' ? selectedEpisode : undefined)
-        .then(progress => {
-          if (progress?.current_time) {
-            setSavedProgress(progress.current_time)
-          }
-        })
-        .catch(() => {})
+    if (currentProfile && type && id) {
+      const progress = getItemProgress(
+        type, 
+        parseInt(id, 10), 
+        type === 'tv' ? selectedSeason : undefined, 
+        type === 'tv' ? selectedEpisode : undefined
+      )
+      if (progress?.current_time) {
+        setSavedProgress(progress.current_time)
+      }
     }
-  }, [user, type, id, selectedSeason, selectedEpisode])
+  }, [currentProfile, type, id, selectedSeason, selectedEpisode, getItemProgress])
 
   // Fetch sources and auto-play best one (no popup)
   const handlePlay = async () => {
@@ -232,7 +233,7 @@ export default function Title() {
   // Handle progress saving
   const handleProgress = (currentTime: number, duration: number) => {
     // Only save if we have valid duration (prevents errors when video fails)
-    if (user && type && id && details && duration > 0 && currentTime > 0) {
+    if (currentProfile && type && id && details && duration > 0 && currentTime > 0) {
       const title = details.media_type === 'movie' ? details.title : details.name
       saveProgress({
         media_type: type as 'movie' | 'tv',
@@ -243,7 +244,7 @@ export default function Title() {
         duration: Math.floor(duration),
         season: type === 'tv' ? selectedSeason : undefined,
         episode: type === 'tv' ? selectedEpisode : undefined
-      }).catch(console.error)
+      })
     }
   }
 
@@ -254,17 +255,17 @@ export default function Title() {
     setPlayingSource(null)
   }
 
-  const handleWatchlistToggle = async () => {
-    if (!user || !details || !type || !id) return
+  const handleWatchlistToggle = () => {
+    if (!currentProfile || !details || !type || !id) return
     setWatchlistLoading(true)
     try {
       const numId = parseInt(id, 10)
       const title = details.media_type === 'movie' ? details.title : details.name
       if (inWatchlist) {
-        await removeFromWatchlist(type, numId)
+        removeFromWatchlist(type, numId)
         setInWatchlist(false)
       } else {
-        await addToWatchlist({
+        addToWatchlist({
           media_type: type as 'movie' | 'tv',
           media_id: numId,
           title,
@@ -457,14 +458,14 @@ export default function Title() {
                 </button>
               )}
               
-              <Tooltip content="Sign in to save to watchlist" disabled={!user}>
+              <Tooltip content="Select a profile to save to watchlist" disabled={!currentProfile}>
                 <button
                   onClick={handleWatchlistToggle}
-                  disabled={!user || watchlistLoading}
+                  disabled={!currentProfile || watchlistLoading}
                   className={`h-12 px-6 rounded font-medium transition flex items-center gap-2 ${
                     inWatchlist
                       ? 'bg-white/20 text-white border border-white/20'
-                      : user 
+                      : currentProfile 
                         ? 'glass hover:bg-white/10' 
                         : 'glass opacity-50 cursor-not-allowed'
                   }`}

@@ -38,10 +38,11 @@ export function Settings() {
   })
 
   useEffect(() => {
-    const key = sourceAggregator.getDebridKey()
-    if (key) {
-      setDebridKey(key)
-      validateDebridKey(key)
+    // Load RD key from environment
+    const envKey = import.meta.env.VITE_REALDEBRID_API_KEY
+    if (envKey && envKey !== 'YOUR_REALDEBRID_KEY_HERE') {
+      setDebridKey(envKey)
+      validateDebridKey(envKey)
     }
     
     // Load OpenSubtitles key
@@ -173,7 +174,7 @@ export function Settings() {
         
         <div className="p-4 bg-white/5 rounded-lg space-y-4">
           <p className="text-sm text-neutral-400">
-            Connect your Real-Debrid account for cached torrents and faster streaming.
+            Real-Debrid API key is configured in environment variables.
           </p>
           
           {/* Show connected user info */}
@@ -190,49 +191,23 @@ export function Settings() {
                       : 'Free account (limited features)'}
                   </p>
                 </div>
-                <button
-                  onClick={clearDebridKey}
-                  className="px-3 py-1 text-sm bg-white/10 hover:bg-white/20 rounded transition"
-                >
-                  Disconnect
-                </button>
               </div>
             </div>
           )}
           
-          {/* API Key input - show if not connected */}
-          {debridStatus !== 'valid' && (
-            <>
-              <div className="flex gap-2">
-                <input
-                  type="password"
-                  value={debridKey}
-                  onChange={(e) => setDebridKey(e.target.value)}
-                  placeholder="API Key from real-debrid.com/apitoken"
-                  className="flex-1 bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-neutral-600 focus:outline-none focus:border-white/20"
-                />
-                <button
-                  onClick={() => validateDebridKey(debridKey)}
-                  disabled={debridStatus === 'checking' || !debridKey}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-lg transition text-sm"
-                >
-                  {debridStatus === 'checking' ? 'Checking...' : 'Connect'}
-                </button>
-              </div>
-
-              {debridStatus === 'invalid' && (
-                <p className="text-sm text-red-400">Invalid API key - make sure you copied the full key</p>
-              )}
-
-              <a
-                href="https://real-debrid.com/apitoken"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-indigo-400 hover:text-indigo-300 transition inline-block"
-              >
-                Get your API key →
-              </a>
-            </>
+          {debridStatus === 'checking' && (
+            <div className="flex items-center gap-2 text-neutral-400">
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-indigo-500 border-t-transparent" />
+              <span>Verifying Real-Debrid connection...</span>
+            </div>
+          )}
+          
+          {debridStatus === 'invalid' && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <p className="text-red-400 text-sm">
+                Real-Debrid API key is invalid or not set. Update VITE_REALDEBRID_API_KEY in your .env file.
+              </p>
+            </div>
           )}
           
           {/* Help text */}
