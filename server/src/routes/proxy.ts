@@ -373,4 +373,43 @@ export default async function proxyRoutes(server: FastifyInstance) {
       return reply.status(500).send({ error: 'Real-Debrid proxy failed' })
     }
   })
+
+  // Handle Real-Debrid DELETE requests
+  server.delete<{
+    Querystring: { apiKey: string; [key: string]: any }
+  }>('/realdebrid/*', async (request: FastifyRequest<{ Querystring: { apiKey: string; [key: string]: any } }>, reply: FastifyReply) => {
+    const { apiKey, ...params } = request.query || {}
+    
+    if (!apiKey) {
+      return reply.status(400).send({ error: 'API key required' })
+    }
+
+    try {
+      // Get the path from the request URL
+      const path = request.url.split('/api/proxy/realdebrid')[1]?.split('?')[0] || '/'
+      const queryString = new URLSearchParams(params as Record<string, string>).toString()
+      const url = `https://api.real-debrid.com/rest/1.0${path}${queryString ? '?' + queryString : ''}`
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`
+        }
+      })
+
+      // DELETE may return empty response
+      const text = await response.text()
+      const responseData = text ? JSON.parse(text) : null
+
+      if (!response.ok) {
+        console.error('Real-Debrid API error:', response.status, responseData)
+        return reply.status(response.status).send(responseData || { error: 'Real-Debrid API error' })
+      }
+
+      return reply.status(204).send()
+    } catch (err) {
+      console.error('Real-Debrid proxy DELETE error:', err)
+      return reply.status(500).send({ error: 'Real-Debrid proxy failed' })
+    }
+  })
 }

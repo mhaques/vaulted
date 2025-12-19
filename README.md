@@ -38,6 +38,13 @@ npm run dev
 | `VITE_TMDB_API_KEY` | Your TMDB API key (required for metadata) |
 | `VITE_API_URL` | Backend API URL (default: `http://localhost:3456`) |
 
+### Real-Debrid Setup (Optional)
+
+1. Sign up for [Real-Debrid](https://real-debrid.com) (premium recommended)
+2. Get your API key from [https://real-debrid.com/apitoken](https://real-debrid.com/apitoken)
+3. In the app, go to Settings → Real-Debrid and paste your API key
+4. Torrentio sources will now stream cached torrents instantly
+
 ### Build for Production
 
 ```bash
@@ -98,6 +105,12 @@ vaulted/
 - ✅ Discover page with Trending, Popular, Top Rated
 - ✅ Search with debounced input and type filters
 - ✅ Title details with poster, backdrop, cast, similar titles
+- ✅ **Real-Debrid Integration** - Stream torrents via cached links
+- ✅ **OpenSubtitles** - Automatic subtitle fetching with built-in API key
+- ✅ User authentication (register/login)
+- ✅ Personal watchlist
+- ✅ Watch progress tracking
+- ✅ Keyboard shortcuts (Space: play/pause, C: subtitles, F: fullscreen)
 - ✅ Responsive layout (mobile + TV/desktop)
 - ✅ Modern dark theme with glass/translucent effects
 - ✅ User authentication (register/login)

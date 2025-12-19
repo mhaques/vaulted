@@ -85,6 +85,26 @@ class SourceAggregator {
     return this.debridApiKey
   }
 
+  // Enable/disable a provider
+  setProviderEnabled(providerId: string, enabled: boolean) {
+    const provider = this.providers.find(p => p.id === providerId)
+    if (provider) {
+      provider.enabled = enabled
+      // Persist to localStorage
+      localStorage.setItem(`vaulted_provider_${providerId}`, enabled ? 'true' : 'false')
+    }
+  }
+
+  // Get all providers
+  getProviders(): SourceProvider[] {
+    return this.providers
+  }
+
+  // Get provider by ID
+  getProvider(providerId: string): SourceProvider | undefined {
+    return this.providers.find(p => p.id === providerId)
+  }
+
   // Fetch sources from all providers
   async fetchAllSources(
     imdbId: string,
@@ -270,14 +290,10 @@ function extractSize(title: string): string {
 }
 
 // Register Torrentio provider
-const torrentioEnabled = localStorage.getItem('enabled_providers')
-  ? JSON.parse(localStorage.getItem('enabled_providers')!).torrentio !== false
-  : true
-
 sourceAggregator.registerProvider({
   id: 'torrentio',
   name: 'Torrentio',
-  enabled: torrentioEnabled,
+  enabled: localStorage.getItem('vaulted_provider_torrentio') !== 'false',
   priority: 1,
   fetch: fetchTorrentio
 })
@@ -345,16 +361,11 @@ async function fetchVidSrc(
   return sources
 }
 
-// Register VidSrc provider
-const vidsrcEnabled = localStorage.getItem('enabled_providers')
-  ? JSON.parse(localStorage.getItem('enabled_providers')!).vidsrc !== false
-  : true
-
 sourceAggregator.registerProvider({
   id: 'vidsrc',
   name: 'VidSrc',
-  enabled: vidsrcEnabled,
-  priority: 2, // After Torrentio (lower quality but always available)
+  enabled: localStorage.getItem('vaulted_provider_vidsrc') === 'true',
+  priority: 2,
   fetch: fetchVidSrc
 })
 
@@ -403,15 +414,10 @@ async function fetchSuperEmbed(
   return sources
 }
 
-// Register SuperEmbed provider
-const superembedEnabled = localStorage.getItem('enabled_providers')
-  ? JSON.parse(localStorage.getItem('enabled_providers')!).superembed !== false
-  : true
-
 sourceAggregator.registerProvider({
   id: 'superembed',
   name: 'Free Sources',
-  enabled: superembedEnabled,
+  enabled: localStorage.getItem('vaulted_provider_superembed') === 'true',
   priority: 3,
   fetch: fetchSuperEmbed
 })
@@ -437,8 +443,8 @@ export async function checkDebridCache(magnetLinks: string[]): Promise<Record<st
 
     if (hashes.length === 0) return {}
 
-    // Real-Debrid wants hashes separated by / but max ~10 at a time to avoid rate limits
-    const batchSize = 10
+    // Real-Debrid wants hashes separated by / but max ~50 at a time
+    const batchSize = 50
     const cached: Record<string, boolean> = {}
     
     for (let i = 0; i < hashes.length; i += batchSize) {
@@ -456,17 +462,9 @@ export async function checkDebridCache(magnetLinks: string[]): Promise<Record<st
             const rdInfo = info as any
             cached[hash.toLowerCase()] = !!(rdInfo && rdInfo.rd && rdInfo.rd.length > 0)
           }
-        } else if (res.status === 429) {
-          console.warn('Rate limited by Real-Debrid, stopping cache check')
-          break
         }
       } catch (batchErr) {
         console.warn('Debrid cache batch error:', batchErr)
-      }
-      
-      // Small delay between batches to avoid rate limits
-      if (i + batchSize < hashes.length) {
-        await new Promise(r => setTimeout(r, 200))
       }
     }
 
@@ -477,14 +475,34 @@ export async function checkDebridCache(magnetLinks: string[]): Promise<Record<st
   }
 }
 
+// Check if a single torrent is cached (to avoid rate limits, only call this once per play attempt)
+// Helper to delete a torrent from Real-Debrid
+async function deleteTorrent(apiKey: string, torrentId: string): Promise<void> {
+  try {
+    await fetch(`${RD_API}/torrents/delete/${torrentId}?apiKey=${apiKey}`, {
+      method: 'DELETE'
+    })
+    console.log('[RD] Deleted torrent:', torrentId)
+  } catch (err) {
+    console.warn('[RD] Failed to delete torrent:', err)
+  }
+}
+
 // Helper to wait for torrent to be ready
 async function waitForTorrentReady(apiKey: string, torrentId: string, maxAttempts = 10): Promise<any> {
   for (let i = 0; i < maxAttempts; i++) {
-    const res = await fetch(`${RD_API}/torrents/info/${torrentId}`, {
-      headers: { 'Authorization': `Bearer ${apiKey}` }
-    })
+    const res = await fetch(`${RD_API}/torrents/info/${torrentId}?apiKey=${apiKey}`)
     
-    if (!res.ok) throw new Error('Failed to get torrent info')
+    // 400 means torrent not cached - delete it and fail
+    if (res.status === 400) {
+      await deleteTorrent(apiKey, torrentId)
+      throw new Error('Torrent not cached on Real-Debrid')
+    }
+    
+    if (!res.ok) {
+      console.error('[RD] Torrent info failed:', res.status)
+      throw new Error('Failed to get torrent info')
+    }
     
     const info = await res.json()
     
@@ -494,6 +512,7 @@ async function waitForTorrentReady(apiKey: string, torrentId: string, maxAttempt
     } else if (info.status === 'downloaded') {
       return info
     } else if (info.status === 'magnet_error' || info.status === 'error' || info.status === 'virus' || info.status === 'dead') {
+      await deleteTorrent(apiKey, torrentId)
       throw new Error(`Torrent error: ${info.status}`)
     }
     
@@ -501,6 +520,7 @@ async function waitForTorrentReady(apiKey: string, torrentId: string, maxAttempt
     await new Promise(r => setTimeout(r, 500))
   }
   
+  await deleteTorrent(apiKey, torrentId)
   throw new Error('Torrent not ready in time')
 }
 
@@ -579,9 +599,13 @@ export async function addToDebrid(magnetLink: string): Promise<string | null> {
 
     // Step 4: Get updated info with links
     console.log('[RD] Getting download links...')
-    const finalRes = await fetch(`${RD_API}/torrents/info/${torrentId}`, {
-      headers: { 'Authorization': `Bearer ${apiKey}` }
-    })
+    const finalRes = await fetch(`${RD_API}/torrents/info/${torrentId}?apiKey=${apiKey}`)
+    
+    if (finalRes.status === 400) {
+      // Torrent disappeared or not cached
+      await deleteTorrent(apiKey, torrentId)
+      throw new Error('Torrent not available')
+    }
     
     if (!finalRes.ok) throw new Error('Failed to get final torrent info')
     

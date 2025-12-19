@@ -30,8 +30,11 @@ export function Settings() {
   
   // Provider toggles
   const [enabledProviders, setEnabledProviders] = useState(() => {
-    const saved = localStorage.getItem('enabled_providers')
-    return saved ? JSON.parse(saved) : { torrentio: true, vidsrc: true, superembed: true }
+    const torrentio = sourceAggregator.getProvider('torrentio')
+    
+    return {
+      torrentio: torrentio?.enabled ?? true
+    }
   })
 
   useEffect(() => {
@@ -96,7 +99,6 @@ export function Settings() {
   const saveSettings = () => {
     localStorage.setItem('vaulted_autoplay', String(autoPlay))
     localStorage.setItem('vaulted_quality', preferredQuality)
-    localStorage.setItem('enabled_providers', JSON.stringify(enabledProviders))
     
     if (debridKey) {
       sourceAggregator.setDebridKey(debridKey)
@@ -106,7 +108,7 @@ export function Settings() {
     setTimeout(() => setSaved(false), 2000)
   }
   
-  const toggleProvider = (providerId: 'torrentio' | 'vidsrc' | 'superembed') => {
+  const toggleProvider = (providerId: 'torrentio') => {
     const updated = { ...enabledProviders, [providerId]: !enabledProviders[providerId] }
     setEnabledProviders(updated)
     sourceAggregator.setProviderEnabled(providerId, updated[providerId])
@@ -310,11 +312,11 @@ export function Settings() {
           Source Providers
         </h2>
         
-        <div className="space-y-2">
-          <label className="flex items-center justify-between p-4 bg-white/5 rounded-lg hover:bg-white/10 transition cursor-pointer">
+        <div className="p-4 bg-white/5 rounded-lg">
+          <label className="flex items-center justify-between cursor-pointer">
             <div>
               <p className="font-medium">Torrentio</p>
-              <p className="text-sm text-neutral-500">Torrent sources (requires Real-Debrid)</p>
+              <p className="text-sm text-neutral-500">Premium torrent sources via Real-Debrid</p>
             </div>
             <input
               type="checkbox"
@@ -323,32 +325,9 @@ export function Settings() {
               className="w-5 h-5 rounded accent-indigo-600"
             />
           </label>
-
-          <label className="flex items-center justify-between p-4 bg-white/5 rounded-lg hover:bg-white/10 transition cursor-pointer">
-            <div>
-              <p className="font-medium">VidSrc</p>
-              <p className="text-sm text-neutral-500">Free streaming embeds (VidSrc.to, VidSrc.me)</p>
-            </div>
-            <input
-              type="checkbox"
-              checked={enabledProviders.vidsrc}
-              onChange={() => toggleProvider('vidsrc')}
-              className="w-5 h-5 rounded accent-indigo-600"
-            />
-          </label>
-
-          <label className="flex items-center justify-between p-4 bg-white/5 rounded-lg hover:bg-white/10 transition cursor-pointer">
-            <div>
-              <p className="font-medium">2Embed / MultiEmbed</p>
-              <p className="text-sm text-neutral-500">Additional free streaming sources</p>
-            </div>
-            <input
-              type="checkbox"
-              checked={enabledProviders.superembed}
-              onChange={() => toggleProvider('superembed')}
-              className="w-5 h-5 rounded accent-indigo-600"
-            />
-          </label>
+          <p className="text-xs text-neutral-600 mt-3 flex items-center gap-1.5">
+            <IconInfo size={12} /> Torrentio requires a Real-Debrid account to stream torrents
+          </p>
         </div>
       </section>
 

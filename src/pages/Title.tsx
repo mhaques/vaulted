@@ -20,7 +20,6 @@ import { Tooltip } from '../components/Tooltip'
 import { VideoPlayer } from '../components/VideoPlayer'
 import sourceAggregator, { 
   type StreamSource, 
-  checkDebridCache, 
   addToDebrid 
 } from '../services/sources'
 import { IconStar, IconPlay, IconLoader, IconBookmark, IconCheck, IconPlus, IconX, IconDisc } from '../components/Icons'
@@ -180,7 +179,6 @@ export default function Title() {
       if (source.url.startsWith('magnet:')) {
         // For torrents, need debrid to get direct link
         if (sourceAggregator.getDebridKey()) {
-          // Try to add torrent - it will fail gracefully if not cached or rate limited
           const directLink = await addToDebrid(source.url)
           if (directLink) {
             streamUrl = directLink
@@ -219,15 +217,9 @@ export default function Title() {
     } catch (err) {
       console.error('Source failed:', source.name, err)
       
-      // Try next source
-      const currentIdx = allSources.findIndex(s => s.id === source.id)
-      if (currentIdx < allSources.length - 1) {
-        console.log('Trying next source...')
-        await tryPlaySource(allSources[currentIdx + 1], allSources)
-      } else {
-        setPlayError('All sources failed. Try selecting manually.')
-        setShowSourcePicker(true)
-      }
+      // Don't auto-retry - show source picker instead
+      setPlayError(`Failed to play: ${err instanceof Error ? err.message : 'Unknown error'}. Please select another source.`)
+      setShowSourcePicker(true)
     }
   }
 

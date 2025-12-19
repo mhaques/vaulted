@@ -6,6 +6,10 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      '/api': {
+        target: 'http://localhost:3456',
+        changeOrigin: true
+      },
       '/torrentio': {
         target: 'https://torrentio.strem.fun',
         changeOrigin: true,
