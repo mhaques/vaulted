@@ -278,4 +278,82 @@ export default async function proxyRoutes(server: FastifyInstance) {
       return reply.status(500).send({ error: 'OpenSubtitles download proxy failed' })
     }
   })
+
+  // Proxy Real-Debrid API
+  server.post<{
+    Body: { apiKey: string; [key: string]: any }
+  }>('/realdebrid/*', async (request: FastifyRequest<{ Body: { apiKey: string; [key: string]: any } }>, reply: FastifyReply) => {
+    const { apiKey, ...data } = request.body || {}
+    
+    if (!apiKey) {
+      return reply.status(400).send({ error: 'API key required' })
+    }
+
+    try {
+      // Get the path from the request URL
+      const path = request.url.split('/api/proxy/realdebrid')[1] || '/'
+      const url = `https://api.real-debrid.com/rest/1.0${path}`
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: Object.keys(data).length > 0 ? JSON.stringify(data) : undefined
+      })
+
+      const text = await response.text()
+      const responseData = text ? JSON.parse(text) : null
+
+      if (!response.ok) {
+        console.error('Real-Debrid API error:', response.status, responseData)
+        return reply.status(response.status).send(responseData || { error: 'Real-Debrid API error' })
+      }
+
+      return reply.send(responseData)
+    } catch (err) {
+      console.error('Real-Debrid proxy error:', err)
+      return reply.status(500).send({ error: 'Real-Debrid proxy failed' })
+    }
+  })
+
+  // Handle Real-Debrid GET requests
+  server.get<{
+    Querystring: { apiKey: string; [key: string]: any }
+  }>('/realdebrid/*', async (request: FastifyRequest<{ Querystring: { apiKey: string; [key: string]: any } }>, reply: FastifyReply) => {
+    const { apiKey, ...params } = request.query || {}
+    
+    if (!apiKey) {
+      return reply.status(400).send({ error: 'API key required' })
+    }
+
+    try {
+      // Get the path from the request URL
+      const path = request.url.split('/api/proxy/realdebrid')[1]?.split('?')[0] || '/'
+      const queryString = new URLSearchParams(params as Record<string, string>).toString()
+      const url = `https://api.real-debrid.com/rest/1.0${path}${queryString ? '?' + queryString : ''}`
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      const text = await response.text()
+      const responseData = text ? JSON.parse(text) : null
+
+      if (!response.ok) {
+        console.error('Real-Debrid API error:', response.status, responseData)
+        return reply.status(response.status).send(responseData || { error: 'Real-Debrid API error' })
+      }
+
+      return reply.send(responseData)
+    } catch (err) {
+      console.error('Real-Debrid proxy GET error:', err)
+      return reply.status(500).send({ error: 'Real-Debrid proxy failed' })
+    }
+  })
 }
