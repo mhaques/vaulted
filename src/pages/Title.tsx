@@ -189,6 +189,12 @@ export default function Title() {
       if (source.url.startsWith('magnet:')) {
         // For torrents, need debrid to get direct link
         if (sourceAggregator.getDebridKey()) {
+          // Only try to add if it's cached (to avoid rate limits)
+          if (!source.cached) {
+            console.log('Torrent not cached, skipping:', source.name)
+            throw new Error('Torrent not cached on Real-Debrid')
+          }
+          
           const directLink = await addToDebrid(source.url)
           if (directLink) {
             streamUrl = directLink
@@ -196,9 +202,8 @@ export default function Title() {
             throw new Error('Failed to get debrid link')
           }
         } else {
-          // No debrid - open magnet externally
-          window.open(source.url, '_blank')
-          return
+          // No debrid - skip torrents
+          throw new Error('Real-Debrid required for torrents')
         }
       }
       
