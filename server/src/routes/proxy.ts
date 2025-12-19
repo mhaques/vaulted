@@ -279,28 +279,31 @@ export default async function proxyRoutes(server: FastifyInstance) {
     }
   })
 
-  // Proxy Real-Debrid API
-  server.post<{
-    Body: { apiKey: string; [key: string]: any }
-  }>('/realdebrid/*', async (request: FastifyRequest<{ Body: { apiKey: string; [key: string]: any } }>, reply: FastifyReply) => {
-    const { apiKey, ...data } = request.body || {}
-    
-    if (!apiKey) {
-      return reply.status(400).send({ error: 'API key required' })
+  // Proxy Real-Debrid API - POST requests
+  server.post('/realdebrid/*', async (request: FastifyRequest, reply: FastifyReply) => {
+    // Extract API key from Authorization header
+    const authHeader = request.headers['authorization'] as string
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return reply.status(400).send({ error: 'Authorization header with Bearer token required' })
     }
+    
+    const apiKey = authHeader.replace('Bearer ', '')
 
     try {
       // Get the path from the request URL
       const path = request.url.split('/api/proxy/realdebrid')[1] || '/'
       const url = `https://api.real-debrid.com/rest/1.0${path}`
+      
+      // Get content type from request
+      const contentType = request.headers['content-type'] || 'application/json'
 
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
+          'Content-Type': contentType
         },
-        body: Object.keys(data).length > 0 ? JSON.stringify(data) : undefined
+        body: request.body ? (typeof request.body === 'string' ? request.body : JSON.stringify(request.body)) : undefined
       })
 
       const text = await response.text()
