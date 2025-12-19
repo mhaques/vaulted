@@ -8,3 +8,8 @@ dist
 *~
 .idea
 .vscode/*.swp
+
+# SQLite databases
+server/data/*.db
+server/data/*.db-shm
+server/data/*.db-wal
