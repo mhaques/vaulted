@@ -445,7 +445,7 @@ export default function Title() {
                 <button 
                   onClick={handlePlay}
                   disabled={!imdbId || sourcesLoading}
-                  className={`px-6 py-3 rounded font-medium transition flex items-center gap-2 ${
+                  className={`h-12 px-6 rounded font-medium transition flex items-center gap-2 ${
                     imdbId 
                       ? 'bg-indigo-600 hover:bg-indigo-500 text-white' 
                       : 'bg-white/10 border border-white/10 opacity-50 cursor-not-allowed'
@@ -466,7 +466,7 @@ export default function Title() {
               {sources.length > 0 && (
                 <button
                   onClick={() => setShowSourcePicker(true)}
-                  className="px-4 py-3 rounded font-medium transition glass hover:bg-white/10 flex items-center gap-2"
+                  className="h-12 px-4 rounded font-medium transition glass hover:bg-white/10 flex items-center gap-2"
                 >
                   <IconDisc className="text-neutral-400" size={18} />
                   Sources ({sources.length})
@@ -477,7 +477,7 @@ export default function Title() {
                 <button
                   onClick={handleWatchlistToggle}
                   disabled={!user || watchlistLoading}
-                  className={`px-6 py-3 rounded font-medium transition ${
+                  className={`h-12 px-6 rounded font-medium transition flex items-center gap-2 ${
                     inWatchlist
                       ? 'bg-white/20 text-white border border-white/20'
                       : user 
@@ -580,6 +580,10 @@ export default function Title() {
           startTime={savedProgress}
           onProgress={handleProgress}
           onClose={closePlayer}
+          onChangeSource={() => {
+            closePlayer()
+            setShowSourcePicker(true)
+          }}
           onError={() => {
             setPlayError('Playback failed. Try a different source.')
             closePlayer()

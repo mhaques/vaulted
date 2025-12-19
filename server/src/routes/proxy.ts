@@ -179,4 +179,103 @@ export default async function proxyRoutes(server: FastifyInstance) {
       return reply.status(500).send({ error: 'Subtitle proxy failed' })
     }
   })
+
+  // Proxy OpenSubtitles API - Search
+  server.get<{
+    Querystring: { 
+      imdb_id?: string
+      query?: string
+      season_number?: string
+      episode_number?: string
+      languages?: string
+      api_key?: string
+    }
+  }>('/opensubtitles/search', async (request, reply) => {
+    const { imdb_id, query, season_number, episode_number, languages, api_key } = request.query
+    
+    const apiKey = api_key || process.env.OPENSUBTITLES_API_KEY
+    
+    if (!apiKey) {
+      return reply.status(400).send({ error: 'API key required. Get one at https://www.opensubtitles.com/consumers' })
+    }
+    
+    if (!imdb_id && !query) {
+      return reply.status(400).send({ error: 'imdb_id or query required' })
+    }
+
+    try {
+      const params = new URLSearchParams()
+      if (imdb_id) params.append('imdb_id', imdb_id)
+      if (query) params.append('query', query)
+      if (season_number) params.append('season_number', season_number)
+      if (episode_number) params.append('episode_number', episode_number)
+      if (languages) params.append('languages', languages)
+      params.append('order_by', 'download_count')
+      params.append('order_direction', 'desc')
+
+      const url = `https://api.opensubtitles.com/api/v1/subtitles?${params}`
+      console.log('OpenSubtitles API proxy request:', url)
+
+      const response = await fetch(url, {
+        headers: {
+          'Api-Key': apiKey,
+          'Content-Type': 'application/json',
+          'User-Agent': 'Vaulted v1.0'
+        }
+      })
+
+      const data = await response.json()
+      
+      if (!response.ok) {
+        console.error('OpenSubtitles API error:', response.status, data)
+        return reply.status(response.status).send(data)
+      }
+
+      return reply.send(data)
+    } catch (err) {
+      console.error('OpenSubtitles proxy error:', err)
+      return reply.status(500).send({ error: 'OpenSubtitles proxy failed' })
+    }
+  })
+
+  // Proxy OpenSubtitles API - Download
+  server.post<{
+    Body: { file_id: number; api_key?: string }
+  }>('/opensubtitles/download', async (request, reply) => {
+    const { file_id, api_key } = request.body || {}
+    
+    const apiKey = api_key || process.env.OPENSUBTITLES_API_KEY
+    
+    if (!apiKey) {
+      return reply.status(400).send({ error: 'API key required' })
+    }
+    
+    if (!file_id) {
+      return reply.status(400).send({ error: 'file_id required' })
+    }
+
+    try {
+      const response = await fetch('https://api.opensubtitles.com/api/v1/download', {
+        method: 'POST',
+        headers: {
+          'Api-Key': apiKey,
+          'Content-Type': 'application/json',
+          'User-Agent': 'Vaulted v1.0'
+        },
+        body: JSON.stringify({ file_id })
+      })
+
+      const data = await response.json()
+      
+      if (!response.ok) {
+        console.error('OpenSubtitles download error:', response.status, data)
+        return reply.status(response.status).send(data)
+      }
+
+      return reply.send(data)
+    } catch (err) {
+      console.error('OpenSubtitles download proxy error:', err)
+      return reply.status(500).send({ error: 'OpenSubtitles download proxy failed' })
+    }
+  })
 }

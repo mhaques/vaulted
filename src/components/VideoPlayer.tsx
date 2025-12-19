@@ -21,6 +21,7 @@ interface VideoPlayerProps {
   onEnded?: () => void
   onError?: () => void
   onClose?: () => void
+  onChangeSource?: () => void
   startTime?: number
   poster?: string
   subtitles?: SubtitleTrack[]
@@ -36,6 +37,7 @@ export function VideoPlayer({
   onEnded,
   onError,
   onClose,
+  onChangeSource,
   startTime = 0,
   poster,
   subtitles: initialSubtitles = [],
@@ -74,18 +76,15 @@ export function VideoPlayer({
   const [loadedSubtitleUrl, setLoadedSubtitleUrl] = useState<string | null>(null)
   const controlsTimeoutRef = useRef<number>()
   const progressIntervalRef = useRef<number>()
+  const lastTapRef = useRef<{ time: number; side: 'left' | 'right' | null }>({ time: 0, side: null })
+  const [skipIndicator, setSkipIndicator] = useState<{ show: boolean; side: 'left' | 'right'; amount: number }>({ show: false, side: 'left', amount: 0 })
 
   // Fetch subtitles from OpenSubtitles
   useEffect(() => {
-    const apiKey = getOpenSubtitlesApiKey()
-    console.log('Subtitle fetch check - imdbId:', imdbId, 'apiKey exists:', !!apiKey)
+    console.log('Subtitle fetch check - imdbId:', imdbId)
     
     if (!imdbId) {
       console.log('No IMDB ID provided, skipping subtitle fetch')
-      return
-    }
-    if (!apiKey) {
-      console.log('No OpenSubtitles API key, skipping subtitle fetch')
       return
     }
     
@@ -174,6 +173,14 @@ export function VideoPlayer({
       setIsPlaying(true)
     }
 
+    const handlePause = () => {
+      setIsPlaying(false)
+    }
+
+    const handlePlay = () => {
+      setIsPlaying(true)
+    }
+
     const handleTimeUpdate = () => {
       setCurrentTime(video.currentTime)
     }
@@ -201,6 +208,8 @@ export function VideoPlayer({
     video.addEventListener('canplay', handleCanPlay)
     video.addEventListener('waiting', handleWaiting)
     video.addEventListener('playing', handlePlaying)
+    video.addEventListener('pause', handlePause)
+    video.addEventListener('play', handlePlay)
     video.addEventListener('timeupdate', handleTimeUpdate)
     video.addEventListener('progress', handleProgress)
     video.addEventListener('ended', handleEnded)
@@ -211,6 +220,8 @@ export function VideoPlayer({
       video.removeEventListener('canplay', handleCanPlay)
       video.removeEventListener('waiting', handleWaiting)
       video.removeEventListener('playing', handlePlaying)
+      video.removeEventListener('pause', handlePause)
+      video.removeEventListener('play', handlePlay)
       video.removeEventListener('timeupdate', handleTimeUpdate)
       video.removeEventListener('progress', handleProgress)
       video.removeEventListener('ended', handleEnded)
@@ -280,6 +291,57 @@ export function VideoPlayer({
     return () => video.textTracks.removeEventListener('addtrack', enableTrack)
   }, [activeSubtitle, loadedSubtitleUrl])
 
+  // Define callbacks before they're used in keyboard controls
+  const togglePlay = useCallback(() => {
+    if (!videoRef.current) return
+    if (isPlaying) {
+      videoRef.current.pause()
+    } else {
+      videoRef.current.play()
+    }
+  }, [isPlaying])
+
+  const toggleFullscreen = useCallback(async () => {
+    if (!containerRef.current) return
+    if (document.fullscreenElement) {
+      await document.exitFullscreen()
+    } else {
+      await containerRef.current.requestFullscreen()
+    }
+  }, [])
+
+  const togglePiP = useCallback(async () => {
+    if (!videoRef.current) return
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture()
+      } else {
+        await videoRef.current.requestPictureInPicture()
+      }
+    } catch (err) {
+      console.error('PiP error:', err)
+    }
+  }, [])
+
+  // Handle double-tap/key to skip (defined before keyboard controls that use it)
+  const handleDoubleTap = useCallback((side: 'left' | 'right') => {
+    if (!videoRef.current) return
+    const skipAmount = 10
+    if (side === 'left') {
+      videoRef.current.currentTime -= skipAmount
+    } else {
+      videoRef.current.currentTime += skipAmount
+    }
+    // Show skip indicator
+    setSkipIndicator(prev => ({
+      show: true,
+      side,
+      amount: prev.side === side && prev.show ? prev.amount + skipAmount : skipAmount
+    }))
+    // Hide after animation
+    setTimeout(() => setSkipIndicator(prev => ({ ...prev, show: false, amount: 0 })), 800)
+  }, [])
+
   // Keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -294,12 +356,12 @@ export function VideoPlayer({
         case 'ArrowLeft':
         case 'j':
           e.preventDefault()
-          videoRef.current.currentTime -= 10
+          handleDoubleTap('left')
           break
         case 'ArrowRight':
         case 'l':
           e.preventDefault()
-          videoRef.current.currentTime += 10
+          handleDoubleTap('right')
           break
         case 'ArrowUp':
           e.preventDefault()
@@ -354,7 +416,7 @@ export function VideoPlayer({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose, showSettings, activeSubtitle, availableSubtitles])
+  }, [onClose, showSettings, activeSubtitle, availableSubtitles, handleDoubleTap, togglePlay, toggleFullscreen])
 
   // Apply playback speed
   useEffect(() => {
@@ -370,37 +432,6 @@ export function VideoPlayer({
       videoRef.current.muted = isMuted
     }
   }, [volume, isMuted])
-
-  const togglePlay = useCallback(() => {
-    if (!videoRef.current) return
-    if (isPlaying) {
-      videoRef.current.pause()
-    } else {
-      videoRef.current.play()
-    }
-  }, [isPlaying])
-
-  const toggleFullscreen = useCallback(async () => {
-    if (!containerRef.current) return
-    if (document.fullscreenElement) {
-      await document.exitFullscreen()
-    } else {
-      await containerRef.current.requestFullscreen()
-    }
-  }, [])
-
-  const togglePiP = useCallback(async () => {
-    if (!videoRef.current) return
-    try {
-      if (document.pictureInPictureElement) {
-        await document.exitPictureInPicture()
-      } else {
-        await videoRef.current.requestPictureInPicture()
-      }
-    } catch (err) {
-      console.error('PiP error:', err)
-    }
-  }, [])
 
   const seek = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!videoRef.current) return
@@ -420,6 +451,43 @@ export function VideoPlayer({
     return `${m}:${s.toString().padStart(2, '0')}`
   }
 
+  const handleVideoAreaClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('.settings-menu') || 
+        (e.target as HTMLElement).closest('button') ||
+        (e.target as HTMLElement).closest('.controls-area')) {
+      return
+    }
+    
+    const rect = e.currentTarget.getBoundingClientRect()
+    const clickX = e.clientX - rect.left
+    const isLeftSide = clickX < rect.width / 3
+    const isRightSide = clickX > (rect.width * 2) / 3
+    const side = isLeftSide ? 'left' : isRightSide ? 'right' : null
+    
+    const now = Date.now()
+    const timeSinceLastTap = now - lastTapRef.current.time
+    
+    // Double tap detection (within 300ms, same side)
+    if (timeSinceLastTap < 300 && side && (lastTapRef.current.side === side || lastTapRef.current.side === null)) {
+      handleDoubleTap(side)
+      lastTapRef.current = { time: 0, side: null }
+    } else {
+      // Single tap - toggle play/pause (with delay to check for double tap)
+      lastTapRef.current = { time: now, side }
+      if (!side) {
+        // Center tap - immediate play/pause
+        togglePlay()
+      } else {
+        // Side tap - wait to see if it's a double tap
+        setTimeout(() => {
+          if (Date.now() - lastTapRef.current.time >= 290) {
+            togglePlay()
+          }
+        }, 300)
+      }
+    }
+  }, [handleDoubleTap, togglePlay])
+
   const handleMouseMove = () => {
     setShowControls(true)
     if (controlsTimeoutRef.current) {
@@ -431,7 +499,7 @@ export function VideoPlayer({
 
   // Settings menu component
   const SettingsMenu = () => (
-    <div className="absolute bottom-20 right-4 w-72 bg-black/95 backdrop-blur-xl rounded-xl border border-white/10 overflow-hidden shadow-2xl">
+    <div className="w-72 bg-black/95 backdrop-blur-xl rounded-xl border border-white/10 overflow-hidden shadow-2xl">
       {settingsTab === 'main' && (
         <div className="divide-y divide-white/5">
           <button
@@ -583,7 +651,16 @@ export function VideoPlayer({
             ) : !getOpenSubtitlesApiKey() ? (
               <div className="p-4 text-center text-neutral-500 text-sm">
                 <p className="mb-2">OpenSubtitles API key required</p>
-                <p className="text-xs">Add your API key in Settings</p>
+                <p className="text-xs">Get a free API key at:</p>
+                <a 
+                  href="https://www.opensubtitles.com/consumers" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-indigo-400 text-xs hover:underline"
+                >
+                  opensubtitles.com/consumers
+                </a>
+                <p className="text-xs mt-2">Then add it in Settings → Subtitles</p>
               </div>
             ) : (
               <div className="p-4 text-center text-neutral-500 text-sm">
@@ -668,6 +745,12 @@ export function VideoPlayer({
                 }}>Sample subtitle text</span>
               </p>
             </div>
+            
+            <div className="pt-3 mt-2 border-t border-white/10">
+              <p className="text-xs text-neutral-500 text-center">
+                💡 If subtitles are out of sync, try a different subtitle from the list - timing varies by video release.
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -702,6 +785,16 @@ export function VideoPlayer({
 
   return (
     <div className="fixed inset-0 z-[100] bg-black">
+      {/* Dynamic subtitle styling */}
+      <style>{`
+        video::cue {
+          font-size: ${subtitleSize}%;
+          background: ${subtitleBackground ? 'rgba(0, 0, 0, 0.8)' : 'transparent'};
+          color: white;
+          text-shadow: ${subtitleBackground ? 'none' : '2px 2px 4px rgba(0,0,0,0.9), -1px -1px 2px rgba(0,0,0,0.9)'};
+          padding: 4px 8px;
+        }
+      `}</style>
       <div
         ref={containerRef}
         className="relative w-full h-full group"
@@ -765,15 +858,38 @@ export function VideoPlayer({
           </button>
         )}
 
-        {/* Click overlay for play/pause - covers entire video area */}
+        {/* Source selection button - top right */}
+        {onChangeSource && (
+          <button 
+            onClick={onChangeSource} 
+            className={`absolute top-4 right-4 z-50 bg-black/60 hover:bg-black/80 text-white hover:text-indigo-400 transition px-4 py-2 rounded-full backdrop-blur-sm text-sm font-medium flex items-center gap-2 ${showControls ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}
+            title="Change Source"
+          >
+            <IconSettings size={16} />
+            Sources
+          </button>
+        )}
+
+        {/* Double-tap skip indicators */}
+        {skipIndicator.show && (
+          <div 
+            className={`absolute top-1/2 -translate-y-1/2 z-30 pointer-events-none animate-pulse ${
+              skipIndicator.side === 'left' ? 'left-16' : 'right-16'
+            }`}
+          >
+            <div className="flex flex-col items-center gap-1 text-white">
+              <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur flex items-center justify-center">
+                {skipIndicator.side === 'left' ? <IconSkipBack size={28} /> : <IconSkipForward size={28} />}
+              </div>
+              <span className="text-sm font-medium">{skipIndicator.amount}s</span>
+            </div>
+          </div>
+        )}
+
+        {/* Click overlay for play/pause and double-tap skip */}
         <div 
           className="absolute inset-0 cursor-pointer z-10"
-          onClick={(e) => {
-            if (!(e.target as HTMLElement).closest('.settings-menu') && 
-                !(e.target as HTMLElement).closest('button')) {
-              togglePlay()
-            }
-          }}
+          onClick={handleVideoAreaClick}
         />
 
         {/* Play/Pause overlay icon */}
@@ -787,16 +903,19 @@ export function VideoPlayer({
           </div>
         )}
 
-        {/* Settings menu */}
+        {/* Settings menu - higher z-index than click overlay */}
         {showSettings && (
-          <div className="settings-menu z-40">
+          <div 
+            className="settings-menu absolute bottom-20 right-4 z-[60]"
+            onClick={(e) => e.stopPropagation()}
+          >
             <SettingsMenu />
           </div>
         )}
 
         {/* Controls */}
         <div
-          className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 pt-20 transition-opacity duration-300 z-30 ${
+          className={`controls-area absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 pt-20 transition-opacity duration-300 z-30 ${
             showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}
         >

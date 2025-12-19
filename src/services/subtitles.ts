@@ -1,9 +1,9 @@
 // OpenSubtitles.com API integration
 const OPENSUBTITLES_API = 'https://api.opensubtitles.com/api/v1'
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3456'
 
-// Default API key (free tier) - users can override in settings
-const DEFAULT_API_KEY = 'lhAqyGtSJf1IaTYYOQc8rMCyclhNX5U9'
-let apiKey = localStorage.getItem('vaulted_opensubtitles_key') || DEFAULT_API_KEY
+// User's API key from settings (get free key at https://www.opensubtitles.com/consumers)
+let apiKey = localStorage.getItem('vaulted_opensubtitles_key') || ''
 
 export interface Subtitle {
   id: string
@@ -88,44 +88,38 @@ export async function searchSubtitles(
   episode?: number,
   languages: string[] = ['en']
 ): Promise<Subtitle[]> {
+  // Check if API key is configured
   if (!apiKey) {
-    console.log('No OpenSubtitles API key set')
+    console.log('No OpenSubtitles API key configured. Get one at https://www.opensubtitles.com/consumers')
     return []
   }
 
   try {
-    // Build query parameters
+    // Build query parameters for backend proxy
     const params = new URLSearchParams()
+    params.append('imdb_id', imdbId)
     
-    // IMDB ID without 'tt' prefix for the API
-    const imdbNumber = imdbId.replace('tt', '')
-    params.append('imdb_id', imdbNumber)
-    
-    if (season !== undefined) {
+    if (season !== undefined && season > 0) {
       params.append('season_number', String(season))
     }
-    if (episode !== undefined) {
+    if (episode !== undefined && episode > 0) {
       params.append('episode_number', String(episode))
     }
-    
-    // Add language filter
     if (languages.length > 0) {
       params.append('languages', languages.join(','))
     }
-    
-    // Order by download count (most popular)
-    params.append('order_by', 'download_count')
-    params.append('order_direction', 'desc')
+    params.append('api_key', apiKey)
 
-    const response = await fetch(`${OPENSUBTITLES_API}/subtitles?${params}`, {
-      headers: {
-        'Api-Key': apiKey,
-        'Content-Type': 'application/json',
-        'User-Agent': 'Vaulted v1.0'
-      }
-    })
+    const url = `${API_BASE}/api/proxy/opensubtitles/search?${params}`
+    console.log('OpenSubtitles proxy request:', url)
+
+    const response = await fetch(url)
+
+    console.log('OpenSubtitles response status:', response.status)
 
     if (!response.ok) {
+      const errorText = await response.text()
+      console.error('OpenSubtitles error:', response.status, errorText)
       if (response.status === 401) {
         console.error('OpenSubtitles: Invalid API key')
       } else if (response.status === 429) {
@@ -135,6 +129,8 @@ export async function searchSubtitles(
     }
 
     const data: SearchResponse = await response.json()
+    console.log('OpenSubtitles response data:', data)
+    console.log('OpenSubtitles results count:', data.data?.length || 0)
     
     // Convert to our subtitle format
     const subtitles: Subtitle[] = data.data.map(result => {
@@ -172,18 +168,15 @@ export async function searchSubtitles(
 }
 
 export async function getSubtitleDownloadUrl(fileId: number): Promise<string | null> {
-  if (!apiKey) return null
-
   try {
-    const response = await fetch(`${OPENSUBTITLES_API}/download`, {
+    const response = await fetch(`${API_BASE}/api/proxy/opensubtitles/download`, {
       method: 'POST',
       headers: {
-        'Api-Key': apiKey,
-        'Content-Type': 'application/json',
-        'User-Agent': 'Vaulted v1.0'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        file_id: fileId
+        file_id: fileId,
+        api_key: apiKey || undefined
       })
     })
 
