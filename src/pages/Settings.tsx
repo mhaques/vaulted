@@ -52,18 +52,24 @@ export function Settings() {
 
     setDebridStatus('checking')
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/proxy/realdebrid/user`, {
-        headers: { 'Authorization': `Bearer ${key}` }
+      const url = new URL(`${import.meta.env.VITE_API_URL}/api/proxy/realdebrid/user`)
+      url.searchParams.append('apiKey', key)
+      
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: { 
+          'Content-Type': 'application/json'
+        }
       })
       
-      if (res.ok) {
-        const userData = await res.json()
+      if (response.ok) {
+        const userData = await response.json()
         setDebridStatus('valid')
         setDebridUser(userData)
         sourceAggregator.setDebridKey(key)
       } else {
-        const errData = await res.json().catch(() => ({}))
-        console.error('RD validation failed:', res.status, errData)
+        const errData = await response.json().catch(() => ({}))
+        console.error('RD validation failed:', response.status, errData)
         setDebridStatus('invalid')
         setDebridUser(null)
       }
