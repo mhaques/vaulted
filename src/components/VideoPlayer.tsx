@@ -537,18 +537,16 @@ export function VideoPlayer({
             <span className="text-neutral-400">→</span>
           </button>
           
-          {audioTracks.length > 1 && (
-            <button
-              onClick={() => setSettingsTab('audio')}
-              className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition"
-            >
-              <div className="flex items-center gap-3">
-                <IconVolume size={18} />
-                <span>Audio Track</span>
-              </div>
-              <span className="text-neutral-400">{audioTracks[activeAudioTrack]?.label || 'Default'} →</span>
-            </button>
-          )}
+          <button
+            onClick={() => setSettingsTab('audio')}
+            className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition"
+          >
+            <div className="flex items-center gap-3">
+              <IconVolume size={18} />
+              <span>Audio Track</span>
+            </div>
+            <span className="text-neutral-400">{audioTracks[activeAudioTrack]?.label || 'Default'} →</span>
+          </button>
           
           <button
             onClick={togglePiP}
@@ -696,34 +694,41 @@ export function VideoPlayer({
             <span className="font-medium">Audio Track</span>
           </button>
           <div className="max-h-64 overflow-auto">
-            {audioTracks.map((track) => (
-              <button
-                key={track.id}
-                onClick={() => {
-                  const video = videoRef.current
-                  if (!video || !video.audioTracks) return
-                  
-                  // Disable all tracks
-                  for (let i = 0; i < video.audioTracks.length; i++) {
-                    video.audioTracks[i].enabled = false
-                  }
-                  // Enable selected track
-                  video.audioTracks[track.id].enabled = true
-                  setActiveAudioTrack(track.id)
-                  console.log('[VideoPlayer] Switched to audio track:', track.label, track.language)
-                  setSettingsTab('main')
-                }}
-                className={`w-full flex items-center justify-between p-3 hover:bg-white/10 transition cursor-pointer ${
-                  activeAudioTrack === track.id ? 'text-indigo-400 bg-white/5' : 'text-white'
-                }`}
-              >
-                <div className="flex flex-col items-start">
-                  <span>{track.label}</span>
-                  <span className="text-xs text-neutral-500">{track.language}</span>
-                </div>
-                {activeAudioTrack === track.id && <IconCheck size={18} />}
-              </button>
-            ))}
+            {audioTracks.length > 0 ? (
+              audioTracks.map((track) => (
+                <button
+                  key={track.id}
+                  onClick={() => {
+                    const video = videoRef.current
+                    if (!video || !video.audioTracks) return
+                    
+                    // Disable all tracks
+                    for (let i = 0; i < video.audioTracks.length; i++) {
+                      video.audioTracks[i].enabled = false
+                    }
+                    // Enable selected track
+                    video.audioTracks[track.id].enabled = true
+                    setActiveAudioTrack(track.id)
+                    console.log('[VideoPlayer] Switched to audio track:', track.label, track.language)
+                    setSettingsTab('main')
+                  }}
+                  className={`w-full flex items-center justify-between p-3 hover:bg-white/10 transition cursor-pointer ${
+                    activeAudioTrack === track.id ? 'text-indigo-400 bg-white/5' : 'text-white'
+                  }`}
+                >
+                  <div className="flex flex-col items-start">
+                    <span>{track.label}</span>
+                    <span className="text-xs text-neutral-500">{track.language}</span>
+                  </div>
+                  {activeAudioTrack === track.id && <IconCheck size={18} />}
+                </button>
+              ))
+            ) : (
+              <div className="p-4 text-center text-neutral-500 text-sm">
+                <p className="mb-2">No audio tracks detected</p>
+                <p className="text-xs">This video may only have one audio track, or your browser doesn't support audio track selection.</p>
+              </div>
+            )}
           </div>
         </div>
       )}
