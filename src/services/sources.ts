@@ -437,8 +437,8 @@ export async function checkDebridCache(magnetLinks: string[]): Promise<Record<st
 
     if (hashes.length === 0) return {}
 
-    // Real-Debrid wants hashes separated by / but max ~50 at a time
-    const batchSize = 50
+    // Real-Debrid wants hashes separated by / but max ~10 at a time to avoid rate limits
+    const batchSize = 10
     const cached: Record<string, boolean> = {}
     
     for (let i = 0; i < hashes.length; i += batchSize) {
@@ -456,9 +456,17 @@ export async function checkDebridCache(magnetLinks: string[]): Promise<Record<st
             const rdInfo = info as any
             cached[hash.toLowerCase()] = !!(rdInfo && rdInfo.rd && rdInfo.rd.length > 0)
           }
+        } else if (res.status === 429) {
+          console.warn('Rate limited by Real-Debrid, stopping cache check')
+          break
         }
       } catch (batchErr) {
         console.warn('Debrid cache batch error:', batchErr)
+      }
+      
+      // Small delay between batches to avoid rate limits
+      if (i + batchSize < hashes.length) {
+        await new Promise(r => setTimeout(r, 200))
       }
     }
 

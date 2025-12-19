@@ -134,9 +134,18 @@ export default function Title() {
         type === 'tv' ? selectedEpisode : undefined
       )
       
-      // Check debrid cache status
+      // Check debrid cache status - only check top 10 to avoid rate limits
       const magnetLinks = fetchedSources
         .filter(s => s.url.startsWith('magnet:'))
+        .sort((a, b) => {
+          // Sort by quality first
+          const qualityRank: Record<string, number> = { '4K': 4, '1080p': 3, '720p': 2, '480p': 1, 'Unknown': 0 }
+          const qualityDiff = (qualityRank[b.quality] || 0) - (qualityRank[a.quality] || 0)
+          if (qualityDiff !== 0) return qualityDiff
+          // Then by seeds
+          return (b.seeds || 0) - (a.seeds || 0)
+        })
+        .slice(0, 10) // Only check top 10 torrents
         .map(s => s.url)
       
       if (magnetLinks.length > 0 && sourceAggregator.getDebridKey()) {
