@@ -296,6 +296,20 @@ export default async function proxyRoutes(server: FastifyInstance) {
       
       // Get content type from request
       const contentType = request.headers['content-type'] || 'application/json'
+      
+      // Prepare body based on content type
+      let bodyToSend: string | undefined
+      if (request.body) {
+        if (contentType.includes('application/x-www-form-urlencoded')) {
+          // Convert parsed body back to form-urlencoded string
+          const bodyObj = request.body as Record<string, any>
+          bodyToSend = new URLSearchParams(bodyObj).toString()
+        } else if (typeof request.body === 'string') {
+          bodyToSend = request.body
+        } else {
+          bodyToSend = JSON.stringify(request.body)
+        }
+      }
 
       const response = await fetch(url, {
         method: 'POST',
@@ -303,7 +317,7 @@ export default async function proxyRoutes(server: FastifyInstance) {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': contentType
         },
-        body: request.body ? (typeof request.body === 'string' ? request.body : JSON.stringify(request.body)) : undefined
+        body: bodyToSend
       })
 
       const text = await response.text()
