@@ -13,15 +13,20 @@ import {
   type CastMember,
   type MediaItem
 } from '../services/tmdb'
+import { useAuth } from '../contexts/AuthContext'
+import { isInWatchlist, addToWatchlist, removeFromWatchlist } from '../services/api'
 
 type Details = (MovieDetails & { media_type: 'movie' }) | (TVDetails & { media_type: 'tv' })
 
 export default function Title() {
   const { type, id } = useParams<{ type: 'movie' | 'tv'; id: string }>()
+  const { user } = useAuth()
   const [details, setDetails] = useState<Details | null>(null)
   const [cast, setCast] = useState<CastMember[]>([])
   const [similar, setSimilar] = useState<MediaItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [inWatchlist, setInWatchlist] = useState(false)
+  const [watchlistLoading, setWatchlistLoading] = useState(false)
 
   useEffect(() => {
     if (!type || !id) return
@@ -57,6 +62,42 @@ export default function Title() {
     }
     fetchData()
   }, [type, id])
+
+  // Check watchlist status when user is logged in
+  useEffect(() => {
+    if (user && type && id) {
+      isInWatchlist(type, parseInt(id, 10))
+        .then(setInWatchlist)
+        .catch(() => setInWatchlist(false))
+    } else {
+      setInWatchlist(false)
+    }
+  }, [user, type, id])
+
+  const handleWatchlistToggle = async () => {
+    if (!user || !details || !type || !id) return
+    setWatchlistLoading(true)
+    try {
+      const numId = parseInt(id, 10)
+      const title = details.media_type === 'movie' ? details.title : details.name
+      if (inWatchlist) {
+        await removeFromWatchlist(type, numId)
+        setInWatchlist(false)
+      } else {
+        await addToWatchlist({
+          media_type: type as 'movie' | 'tv',
+          media_id: numId,
+          title,
+          poster_path: details.poster_path || undefined
+        })
+        setInWatchlist(true)
+      }
+    } catch (err) {
+      console.error('Failed to update watchlist:', err)
+    } finally {
+      setWatchlistLoading(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -151,11 +192,16 @@ export default function Title() {
               <button className="bg-white/10 hover:bg-white/20 px-6 py-3 rounded font-medium transition border border-white/10">
                 ▸ Play
               </button>
-              <button className="glass hover:bg-white/10 px-6 py-3 rounded font-medium transition">
-                + Watchlist
-              </button>
-              <button className="glass hover:bg-white/10 px-6 py-3 rounded font-medium transition">
-                ✓ Watched
+              <button
+                onClick={handleWatchlistToggle}
+                disabled={!user || watchlistLoading}
+                className={`px-6 py-3 rounded font-medium transition ${
+                  inWatchlist
+                    ? 'bg-white/20 text-white border border-white/20'
+                    : 'glass hover:bg-white/10'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {watchlistLoading ? '...' : inWatchlist ? '✓ In Watchlist' : '+ Watchlist'}
               </button>
             </div>
 
