@@ -208,8 +208,8 @@ const TORRENTIO_BASE = import.meta.env.DEV
   : 'https://torrentio.strem.fun'
 
 // Torrentio with common indexers configured
-// Config: sort by quality, filter out low quality
-const TORRENTIO_CONFIG = 'sort=qualitysize|qualityfilter=480p,scr,cam'
+// Config: sort by quality, filter out low quality, English only
+const TORRENTIO_CONFIG = 'sort=qualitysize|qualityfilter=480p,scr,cam|lang=english'
 
 interface TorrentioStream {
   name: string
