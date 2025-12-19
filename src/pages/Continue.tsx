@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getContinueWatching, clearProgress, ProgressItem } from '../services/api'
 import { IMG } from '../services/tmdb'
+import { IconPlay, IconX } from '../components/Icons'
 
 export default function Continue() {
   const { user } = useAuth()
@@ -113,15 +114,15 @@ export default function Continue() {
                   {/* Play Button */}
                   <div className="flex items-center justify-center">
                     <button className="bg-white/10 hover:bg-white/20 p-3 rounded transition border border-white/10">
-                      ▸
+                      <IconPlay size={20} />
                     </button>
                   </div>
                 </Link>
                 <button
                   onClick={() => handleClear(item.media_type, item.media_id)}
-                  className="absolute top-2 right-2 bg-black/80 hover:bg-red-600 text-white p-1.5 rounded opacity-0 group-hover:opacity-100 transition text-xs"
+                  className="absolute top-2 right-2 bg-black/80 hover:bg-red-600 text-white p-1.5 rounded opacity-0 group-hover:opacity-100 transition"
                 >
-                  ✕
+                  <IconX size={14} />
                 </button>
               </div>
             )

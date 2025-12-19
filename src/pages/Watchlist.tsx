@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getWatchlist, removeFromWatchlist, WatchlistItem } from '../services/api'
 import { IMG } from '../services/tmdb'
+import { IconX, IconFilm } from '../components/Icons'
 
 export default function Watchlist() {
   const { user } = useAuth()
@@ -71,7 +72,7 @@ export default function Watchlist() {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <div className="text-3xl text-neutral-700">◼</div>
+                      <IconFilm size={36} className="text-neutral-700" />
                     </div>
                   )}
                 </div>
@@ -87,7 +88,7 @@ export default function Watchlist() {
                 }}
                 className="absolute top-2 right-2 bg-black/80 hover:bg-red-600 text-white p-1.5 rounded opacity-0 group-hover:opacity-100 transition"
               >
-                ✕
+                <IconX size={14} />
               </button>
             </div>
           ))}

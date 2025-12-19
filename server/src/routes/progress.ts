@@ -32,30 +32,44 @@ export default async function progressRoutes(server: FastifyInstance) {
   })
 
   // Update progress
-  server.post<{ Body: ProgressUpdate }>('/', async (request) => {
-    const { id: userId } = request.user as { id: number }
-    const { media_type, media_id, title, poster_path, season, episode, progress_seconds, duration_seconds } = request.body
+  server.post<{ Body: ProgressUpdate }>('/', async (request, reply) => {
+    try {
+      const { id: userId } = request.user as { id: number }
+      const { media_type, media_id, title, poster_path, season, episode, progress_seconds, duration_seconds } = request.body
 
-    const stmt = db.prepare(`
-      INSERT INTO watch_progress (user_id, media_type, media_id, title, poster_path, season, episode, progress_seconds, duration_seconds)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(user_id, media_type, media_id, season, episode) DO UPDATE SET
-        progress_seconds = excluded.progress_seconds,
-        duration_seconds = excluded.duration_seconds,
-        updated_at = datetime('now')
-    `)
-    stmt.run(userId, media_type, media_id, title, poster_path || null, season || null, episode || null, progress_seconds, duration_seconds)
+      // Validate required fields
+      if (!media_type || !media_id || !title || progress_seconds === undefined || duration_seconds === undefined) {
+        return reply.status(400).send({ error: 'Missing required fields' })
+      }
 
-    // If watched > 95%, add to history
-    if (progress_seconds >= duration_seconds * 0.95) {
-      const historyStmt = db.prepare(`
-        INSERT INTO watch_history (user_id, media_type, media_id, title, poster_path, season, episode)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+      // Use 0 for null season/episode to handle UNIQUE constraint properly
+      const seasonVal = season ?? 0
+      const episodeVal = episode ?? 0
+
+      const stmt = db.prepare(`
+        INSERT INTO watch_progress (user_id, media_type, media_id, title, poster_path, season, episode, progress_seconds, duration_seconds)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id, media_type, media_id, season, episode) DO UPDATE SET
+          progress_seconds = excluded.progress_seconds,
+          duration_seconds = excluded.duration_seconds,
+          updated_at = datetime('now')
       `)
-      historyStmt.run(userId, media_type, media_id, title, poster_path || null, season || null, episode || null)
-    }
+      stmt.run(userId, media_type, media_id, title, poster_path || null, seasonVal, episodeVal, progress_seconds, duration_seconds)
 
-    return { success: true }
+      // If watched > 95%, add to history
+      if (progress_seconds >= duration_seconds * 0.95) {
+        const historyStmt = db.prepare(`
+          INSERT INTO watch_history (user_id, media_type, media_id, title, poster_path, season, episode)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `)
+        historyStmt.run(userId, media_type, media_id, title, poster_path || null, seasonVal, episodeVal)
+      }
+
+      return { success: true }
+    } catch (err) {
+      console.error('Progress update error:', err)
+      return reply.status(500).send({ error: 'Failed to update progress' })
+    }
   })
 
   // Get progress for specific item

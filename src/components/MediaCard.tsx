@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { IMG, getTitle, getReleaseYear, type MediaItem } from '../services/tmdb'
+import { IconStar, IconFilm } from './Icons'
 
 interface MediaCardProps {
   item: MediaItem
@@ -27,12 +28,12 @@ export function MediaCard({ item, size = 'md' }: MediaCardProps) {
           />
         ) : (
           <div className="w-full h-full bg-neutral-900 flex items-center justify-center text-neutral-700">
-            <span className="text-3xl">◻</span>
+            <IconFilm size={36} />
           </div>
         )}
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <div className="flex items-center gap-1 text-xs">
-            <span className="text-white">★</span>
+            <IconStar className="text-yellow-400" size={12} />
             <span>{item.vote_average.toFixed(1)}</span>
           </div>
         </div>

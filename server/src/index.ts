@@ -4,9 +4,12 @@ import jwt from '@fastify/jwt'
 import authRoutes from './routes/auth.js'
 import watchlistRoutes from './routes/watchlist.js'
 import progressRoutes from './routes/progress.js'
+import proxyRoutes from './routes/proxy.js'
 
 const server = Fastify({
-  logger: true
+  logger: true,
+  // Increase body size limit for proxy responses
+  bodyLimit: 1024 * 1024 * 100 // 100MB
 })
 
 // Register plugins
@@ -35,6 +38,7 @@ server.decorate('authenticate', async (request: any, reply: any) => {
 await server.register(authRoutes, { prefix: '/api/auth' })
 await server.register(watchlistRoutes, { prefix: '/api/watchlist' })
 await server.register(progressRoutes, { prefix: '/api/progress' })
+await server.register(proxyRoutes, { prefix: '/api/proxy' })
 
 // Health check
 server.get('/api/health', async () => {

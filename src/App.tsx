@@ -7,6 +7,9 @@ import Search from './pages/Search'
 import Title from './pages/Title'
 import Watchlist from './pages/Watchlist'
 import Continue from './pages/Continue'
+import { Contact } from './pages/Contact'
+import { Settings } from './pages/Settings'
+import LiveTV from './pages/LiveTV'
 
 export default function App() {
   return (
@@ -19,6 +22,9 @@ export default function App() {
             <Route path="/title/:type/:id" element={<Title />} />
             <Route path="/watchlist" element={<Watchlist />} />
             <Route path="/continue" element={<Continue />} />
+            <Route path="/live" element={<LiveTV />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/settings" element={<Settings />} />
           </Routes>
         </Layout>
       </BrowserRouter>

@@ -146,6 +146,18 @@ export async function getSimilarTV(id: number) {
   return { results: data.results.map(t => ({ ...t, media_type: 'tv' as const })) }
 }
 
+// External IDs (for IMDB lookup)
+export interface ExternalIds {
+  imdb_id: string | null
+  facebook_id: string | null
+  instagram_id: string | null
+  twitter_id: string | null
+}
+
+export async function getExternalIds(type: 'movie' | 'tv', id: number) {
+  return fetchTMDB<ExternalIds>(`/${type}/${id}/external_ids`)
+}
+
 // Helper to get title from movie or tv
 export function getTitle(item: MediaItem): string {
   return 'title' in item ? item.title : item.name

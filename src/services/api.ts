@@ -140,17 +140,45 @@ export async function updateProgress(item: Omit<ProgressItem, 'updated_at' | 'pr
   })
 }
 
+// Alias for updateProgress with different parameter signature (used by VideoPlayer)
+export async function saveProgress(params: {
+  media_type: 'movie' | 'tv'
+  media_id: number
+  title: string
+  poster_path?: string
+  current_time: number
+  duration: number
+  season?: number
+  episode?: number
+}): Promise<void> {
+  await updateProgress({
+    media_type: params.media_type,
+    media_id: params.media_id,
+    title: params.title,
+    poster_path: params.poster_path,
+    season: params.season,
+    episode: params.episode,
+    progress_seconds: params.current_time,
+    duration_seconds: params.duration,
+  })
+}
+
 export async function getProgress(
   mediaType: string,
   mediaId: number,
   season?: number,
   episode?: number
-): Promise<{ progress_seconds: number; duration_seconds: number }> {
+): Promise<{ progress_seconds: number; duration_seconds: number; current_time?: number } | null> {
   let url = `/api/progress/${mediaType}/${mediaId}`
   if (season !== undefined && episode !== undefined) {
     url += `?season=${season}&episode=${episode}`
   }
-  return apiFetch(url)
+  try {
+    const result = await apiFetch<{ progress_seconds: number; duration_seconds: number }>(url)
+    return { ...result, current_time: result.progress_seconds }
+  } catch {
+    return null
+  }
 }
 
 export async function clearProgress(mediaType: string, mediaId: number): Promise<void> {
