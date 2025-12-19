@@ -62,8 +62,10 @@ export function VideoPlayer({
   const [error, setError] = useState<string | null>(null)
   const [playbackSpeed, setPlaybackSpeed] = useState(1)
   const [showSettings, setShowSettings] = useState(false)
-  const [settingsTab, setSettingsTab] = useState<'main' | 'speed' | 'subtitles' | 'subtitle-settings'>('main')
+  const [settingsTab, setSettingsTab] = useState<'main' | 'speed' | 'subtitles' | 'subtitle-settings' | 'audio'>('main')
   const [activeSubtitle, setActiveSubtitle] = useState<string | null>(null)
+  const [audioTracks, setAudioTracks] = useState<{ id: number; label: string; language: string }[]>([])
+  const [activeAudioTrack, setActiveAudioTrack] = useState<number>(0)
   const [subtitleSize, setSubtitleSize] = useState(() => {
     const saved = localStorage.getItem('vaulted_subtitle_size')
     return saved ? parseInt(saved) : 100
@@ -535,6 +537,19 @@ export function VideoPlayer({
             <span className="text-neutral-400">→</span>
           </button>
           
+          {audioTracks.length > 1 && (
+            <button
+              onClick={() => setSettingsTab('audio')}
+              className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition"
+            >
+              <div className="flex items-center gap-3">
+                <IconVolume size={18} />
+                <span>Audio Track</span>
+              </div>
+              <span className="text-neutral-400">{audioTracks[activeAudioTrack]?.label || 'Default'} →</span>
+            </button>
+          )}
+          
           <button
             onClick={togglePiP}
             className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition"
@@ -667,6 +682,48 @@ export function VideoPlayer({
                 No subtitles found for this video
               </div>
             )}
+          </div>
+        </div>
+      )}
+      
+      {settingsTab === 'audio' && (
+        <div>
+          <button
+            onClick={() => setSettingsTab('main')}
+            className="w-full flex items-center gap-2 p-4 border-b border-white/5 hover:bg-white/5"
+          >
+            <IconChevronLeft size={18} />
+            <span className="font-medium">Audio Track</span>
+          </button>
+          <div className="max-h-64 overflow-auto">
+            {audioTracks.map((track) => (
+              <button
+                key={track.id}
+                onClick={() => {
+                  const video = videoRef.current
+                  if (!video || !video.audioTracks) return
+                  
+                  // Disable all tracks
+                  for (let i = 0; i < video.audioTracks.length; i++) {
+                    video.audioTracks[i].enabled = false
+                  }
+                  // Enable selected track
+                  video.audioTracks[track.id].enabled = true
+                  setActiveAudioTrack(track.id)
+                  console.log('[VideoPlayer] Switched to audio track:', track.label, track.language)
+                  setSettingsTab('main')
+                }}
+                className={`w-full flex items-center justify-between p-3 hover:bg-white/10 transition cursor-pointer ${
+                  activeAudioTrack === track.id ? 'text-indigo-400 bg-white/5' : 'text-white'
+                }`}
+              >
+                <div className="flex flex-col items-start">
+                  <span>{track.label}</span>
+                  <span className="text-xs text-neutral-500">{track.language}</span>
+                </div>
+                {activeAudioTrack === track.id && <IconCheck size={18} />}
+              </button>
+            ))}
           </div>
         </div>
       )}
