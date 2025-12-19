@@ -16,7 +16,10 @@ await server.register(cors, {
 })
 
 await server.register(jwt, {
-  secret: process.env.JWT_SECRET || 'vaulted-dev-secret-change-in-production'
+  secret: process.env.JWT_SECRET || 'vaulted-dev-secret-change-in-production',
+  sign: {
+    expiresIn: '7d' // Tokens expire after 7 days
+  }
 })
 
 // Auth decorator

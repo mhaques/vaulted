@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <defs>
+    <linearGradient id="vaultGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.9" />
+      <stop offset="100%" style="stop-color:#a0a0a0;stop-opacity:0.7" />
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Outer vault door circle -->
+  <circle cx="100" cy="100" r="85" stroke="url(#vaultGrad)" stroke-width="6" fill="none" opacity="0.3"/>
+  
+  <!-- Inner vault ring -->
+  <circle cx="100" cy="100" r="65" stroke="url(#vaultGrad)" stroke-width="3" fill="none" opacity="0.5"/>
+  
+  <!-- V shape made of geometric lines -->
+  <path 
+    d="M60 60 L100 120 L140 60" 
+    stroke="url(#vaultGrad)" 
+    stroke-width="8" 
+    stroke-linecap="round" 
+    stroke-linejoin="round"
+    fill="none"
+    filter="url(#glow)"
+  />
+  
+  <!-- Keyhole accent -->
+  <circle cx="100" cy="145" r="8" fill="url(#vaultGrad)" opacity="0.6"/>
+  <rect x="96" y="145" width="8" height="15" rx="2" fill="url(#vaultGrad)" opacity="0.6"/>
+  
+  <!-- Decorative dots on the vault ring -->
+  <circle cx="100" cy="25" r="4" fill="url(#vaultGrad)" opacity="0.4"/>
+  <circle cx="175" cy="100" r="4" fill="url(#vaultGrad)" opacity="0.4"/>
+  <circle cx="25" cy="100" r="4" fill="url(#vaultGrad)" opacity="0.4"/>
+</svg>

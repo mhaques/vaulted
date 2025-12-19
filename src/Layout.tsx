@@ -128,8 +128,9 @@ export function Layout({ children }: LayoutProps) {
 
       {/* Sidebar for desktop/TV */}
       <aside className="hidden md:flex md:flex-col md:w-56 glass-dark min-h-screen sticky top-0 z-20">
-        <Link to="/" className="text-2xl font-bold px-8 py-6 hover:text-white transition">
-          Vaulted
+        <Link to="/" className="flex items-center gap-3 px-6 py-5 hover:opacity-90 transition">
+          <img src="/logo.svg" alt="Vaulted" className="w-8 h-8" />
+          <span className="text-xl font-bold">Vaulted</span>
         </Link>
         <nav className="flex-1 flex flex-col gap-1 px-4">
           {navItems.map(({ path, label, icon }) => (
@@ -180,8 +181,9 @@ export function Layout({ children }: LayoutProps) {
       <div className="flex-1 flex flex-col min-h-screen">
         {/* Header for mobile */}
         <header className="md:hidden glass-dark px-4 py-3 sticky top-0 z-10 flex items-center justify-between">
-          <Link to="/" className="text-2xl font-bold hover:text-white transition">
-            Vaulted
+          <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition">
+            <img src="/logo.svg" alt="Vaulted" className="w-7 h-7" />
+            <span className="text-xl font-bold">Vaulted</span>
           </Link>
           {!loading && (
             user ? (

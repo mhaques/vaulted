@@ -2,6 +2,33 @@ import { FastifyInstance } from 'fastify'
 import bcrypt from 'bcrypt'
 import db from '../db.js'
 
+// Simple in-memory rate limiter
+const loginAttempts = new Map<string, { count: number; lastAttempt: number }>()
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000 // 15 minutes
+const MAX_ATTEMPTS = 5
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now()
+  const record = loginAttempts.get(ip)
+  
+  if (!record || now - record.lastAttempt > RATE_LIMIT_WINDOW) {
+    loginAttempts.set(ip, { count: 1, lastAttempt: now })
+    return true
+  }
+  
+  if (record.count >= MAX_ATTEMPTS) {
+    return false
+  }
+  
+  record.count++
+  record.lastAttempt = now
+  return true
+}
+
+function resetRateLimit(ip: string) {
+  loginAttempts.delete(ip)
+}
+
 interface RegisterBody {
   username: string
   password: string
@@ -40,8 +67,14 @@ export default async function authRoutes(server: FastifyInstance) {
     }
   })
 
-  // Login
+  // Login with rate limiting
   server.post<{ Body: LoginBody }>('/login', async (request, reply) => {
+    const ip = request.ip
+    
+    if (!checkRateLimit(ip)) {
+      return reply.status(429).send({ error: 'Too many login attempts. Try again in 15 minutes.' })
+    }
+
     const { username, password } = request.body
 
     if (!username || !password) {
@@ -59,6 +92,9 @@ export default async function authRoutes(server: FastifyInstance) {
     if (!valid) {
       return reply.status(401).send({ error: 'Invalid credentials' })
     }
+
+    // Reset rate limit on successful login
+    resetRateLimit(ip)
 
     const token = server.jwt.sign({ id: user.id, username: user.username })
     return { token, user: { id: user.id, username: user.username } }

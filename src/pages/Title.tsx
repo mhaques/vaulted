@@ -15,6 +15,7 @@ import {
 } from '../services/tmdb'
 import { useAuth } from '../contexts/AuthContext'
 import { isInWatchlist, addToWatchlist, removeFromWatchlist } from '../services/api'
+import { Tooltip } from '../components/Tooltip'
 
 type Details = (MovieDetails & { media_type: 'movie' }) | (TVDetails & { media_type: 'tv' })
 
@@ -189,20 +190,29 @@ export default function Title() {
 
             {/* Action Buttons */}
             <div className="flex flex-wrap gap-3 mb-8">
-              <button className="bg-white/10 hover:bg-white/20 px-6 py-3 rounded font-medium transition border border-white/10">
-                ▸ Play
-              </button>
-              <button
-                onClick={handleWatchlistToggle}
-                disabled={!user || watchlistLoading}
-                className={`px-6 py-3 rounded font-medium transition ${
-                  inWatchlist
-                    ? 'bg-white/20 text-white border border-white/20'
-                    : 'glass hover:bg-white/10'
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                {watchlistLoading ? '...' : inWatchlist ? '✓ In Watchlist' : '+ Watchlist'}
-              </button>
+              <Tooltip content="Playback coming soon" disabled={true}>
+                <button 
+                  disabled
+                  className="bg-white/10 px-6 py-3 rounded font-medium transition border border-white/10 opacity-50 cursor-not-allowed"
+                >
+                  ▸ Play
+                </button>
+              </Tooltip>
+              <Tooltip content="Sign in to save to watchlist" disabled={!user}>
+                <button
+                  onClick={handleWatchlistToggle}
+                  disabled={!user || watchlistLoading}
+                  className={`px-6 py-3 rounded font-medium transition ${
+                    inWatchlist
+                      ? 'bg-white/20 text-white border border-white/20'
+                      : user 
+                        ? 'glass hover:bg-white/10' 
+                        : 'glass opacity-50 cursor-not-allowed'
+                  }`}
+                >
+                  {watchlistLoading ? '...' : inWatchlist ? '✓ In Watchlist' : '+ Watchlist'}
+                </button>
+              </Tooltip>
             </div>
 
             {/* Cast */}
