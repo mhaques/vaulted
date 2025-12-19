@@ -11,7 +11,7 @@ if (!existsSync(dataDir)) {
   mkdirSync(dataDir, { recursive: true })
 }
 
-const db = new Database(join(dataDir, 'vaulted.db'))
+const db: Database.Database = new Database(join(dataDir, 'vaulted.db'))
 
 // Enable WAL mode for better performance
 db.pragma('journal_mode = WAL')

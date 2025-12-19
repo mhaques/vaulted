@@ -52,7 +52,7 @@ export function Settings() {
 
     setDebridStatus('checking')
     try {
-      const res = await fetch('https://api.real-debrid.com/rest/1.0/user', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/proxy/realdebrid/user`, {
         headers: { 'Authorization': `Bearer ${key}` }
       })
       

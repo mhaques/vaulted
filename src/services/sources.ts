@@ -408,7 +408,7 @@ sourceAggregator.registerProvider({
 // PROVIDER: Real-Debrid (for cached torrents)
 // ============================================
 
-const RD_API = 'https://api.real-debrid.com/rest/1.0'
+const RD_API = `${import.meta.env.VITE_API_URL}/api/proxy/realdebrid`
 
 export async function checkDebridCache(magnetLinks: string[]): Promise<Record<string, boolean>> {
   const apiKey = sourceAggregator.getDebridKey()
