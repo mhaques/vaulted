@@ -134,31 +134,13 @@ export default function Title() {
         type === 'tv' ? selectedEpisode : undefined
       )
       
-      // Check debrid cache status - only check top 10 to avoid rate limits
-      const magnetLinks = fetchedSources
-        .filter(s => s.url.startsWith('magnet:'))
-        .sort((a, b) => {
-          // Sort by quality first
-          const qualityRank: Record<string, number> = { '4K': 4, '1080p': 3, '720p': 2, '480p': 1, 'Unknown': 0 }
-          const qualityDiff = (qualityRank[b.quality] || 0) - (qualityRank[a.quality] || 0)
-          if (qualityDiff !== 0) return qualityDiff
-          // Then by seeds
-          return (b.seeds || 0) - (a.seeds || 0)
-        })
-        .slice(0, 10) // Only check top 10 torrents
-        .map(s => s.url)
-      
-      if (magnetLinks.length > 0 && sourceAggregator.getDebridKey()) {
-        const cacheStatus = await checkDebridCache(magnetLinks)
-        fetchedSources.forEach(source => {
-          if (source.url.startsWith('magnet:')) {
-            const hash = source.url.match(/btih:([a-fA-F0-9]+)/i)?.[1]?.toLowerCase()
-            if (hash) {
-              source.cached = cacheStatus[hash] || false
-            }
-          }
-        })
-      }
+      // Skip cache checking to avoid rate limits - just try torrents directly
+      // Mark all torrents as potentially cached
+      fetchedSources.forEach(source => {
+        if (source.url.startsWith('magnet:')) {
+          source.cached = true // Optimistically mark as cached
+        }
+      })
       
       const sorted = sourceAggregator.getSortedSources(fetchedSources)
       setSources(sorted)
@@ -198,17 +180,12 @@ export default function Title() {
       if (source.url.startsWith('magnet:')) {
         // For torrents, need debrid to get direct link
         if (sourceAggregator.getDebridKey()) {
-          // Only try to add if it's cached (to avoid rate limits)
-          if (!source.cached) {
-            console.log('Torrent not cached, skipping:', source.name)
-            throw new Error('Torrent not cached on Real-Debrid')
-          }
-          
+          // Try to add torrent - it will fail gracefully if not cached or rate limited
           const directLink = await addToDebrid(source.url)
           if (directLink) {
             streamUrl = directLink
           } else {
-            throw new Error('Failed to get debrid link')
+            throw new Error('Failed to add torrent to Real-Debrid')
           }
         } else {
           // No debrid - skip torrents
