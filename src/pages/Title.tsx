@@ -221,8 +221,9 @@ export default function Title() {
         setPlayerUrl(streamUrl)
         setIsPlaying(true)
       } else {
-        // Open in new tab for other URLs (embeds, etc.)
-        window.open(streamUrl, '_blank')
+        // For embed URLs, use inline player with embed mode
+        setPlayerUrl(streamUrl)
+        setIsPlaying(true)
       }
     } catch (err) {
       console.error('Source failed:', source.name, err)

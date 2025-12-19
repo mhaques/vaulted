@@ -270,10 +270,14 @@ function extractSize(title: string): string {
 }
 
 // Register Torrentio provider
+const torrentioEnabled = localStorage.getItem('enabled_providers')
+  ? JSON.parse(localStorage.getItem('enabled_providers')!).torrentio !== false
+  : true
+
 sourceAggregator.registerProvider({
   id: 'torrentio',
   name: 'Torrentio',
-  enabled: true,
+  enabled: torrentioEnabled,
   priority: 1,
   fetch: fetchTorrentio
 })
@@ -342,10 +346,14 @@ async function fetchVidSrc(
 }
 
 // Register VidSrc provider
+const vidsrcEnabled = localStorage.getItem('enabled_providers')
+  ? JSON.parse(localStorage.getItem('enabled_providers')!).vidsrc !== false
+  : true
+
 sourceAggregator.registerProvider({
   id: 'vidsrc',
   name: 'VidSrc',
-  enabled: true,
+  enabled: vidsrcEnabled,
   priority: 2, // After Torrentio (lower quality but always available)
   fetch: fetchVidSrc
 })
@@ -396,10 +404,14 @@ async function fetchSuperEmbed(
 }
 
 // Register SuperEmbed provider
+const superembedEnabled = localStorage.getItem('enabled_providers')
+  ? JSON.parse(localStorage.getItem('enabled_providers')!).superembed !== false
+  : true
+
 sourceAggregator.registerProvider({
   id: 'superembed',
   name: 'Free Sources',
-  enabled: true,
+  enabled: superembedEnabled,
   priority: 3,
   fetch: fetchSuperEmbed
 })
