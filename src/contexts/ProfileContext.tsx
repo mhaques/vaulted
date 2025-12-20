@@ -5,6 +5,7 @@ export interface Profile {
   name: string
   avatar: string
   passcode: string
+  isAdmin: boolean
   settings: {
     realDebridKey?: string
     openSubtitlesKey?: string
@@ -18,6 +19,7 @@ interface ProfileContextType {
   createProfile: (name: string, avatar: string, passcode: string) => void
   editProfile: (id: string, updates: Partial<Profile>) => void
   deleteProfile: (id: string) => void
+  deleteOwnProfile: (passcode: string) => boolean
   selectProfile: (id: string, passcode: string) => boolean
   lockProfile: () => void
   updateSettings: (settings: Partial<Profile['settings']>) => void
@@ -25,7 +27,7 @@ interface ProfileContextType {
 
 const ProfileContext = createContext<ProfileContextType | null>(null)
 
-const STORAGE_KEY = 'vaulted_profiles'
+const STORAGE_KEY = 'vaulted_profiles_v2' // Changed to clear old profiles
 const CURRENT_PROFILE_KEY = 'vaulted_current_profile'
 
 const AVATAR_OPTIONS = [
@@ -42,6 +44,9 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   // Load profiles from localStorage
   useEffect(() => {
+    // Clear old profile storage
+    localStorage.removeItem('vaulted_profiles')
+    
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
       const loadedProfiles = JSON.parse(stored)
@@ -69,27 +74,45 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }, [profiles])
 
   const createProfile = (name: string, avatar: string, passcode: string) => {
+    // Validate passcode is numbers only
+    if (!/^\d+$/.test(passcode)) {
+      throw new Error('Passcode must contain only numbers')
+    }
+    
+    const isFirstProfile = profiles.length === 0
     const newProfile: Profile = {
       id: `profile_${Date.now()}`,
       name,
       avatar,
       passcode,
+      isAdmin: isFirstProfile, // First profile is admin
       settings: {}
     }
     setProfiles([...profiles, newProfile])
   }
 
   const editProfile = (id: string, updates: Partial<Profile>) => {
+    // Validate passcode if being updated
+    if (updates.passcode && !/^\d+$/.test(updates.passcode)) {
+      throw new Error('Passcode must contain only numbers')
+    }
+    
     setProfiles(profiles.map(p => 
-      p.id === id ? { ...p, ...updates } : p
+      p.id === id ? { ...p, ...updates, isAdmin: p.isAdmin } : p // Preserve isAdmin
     ))
     // Update current profile if it's the one being edited
     if (currentProfile?.id === id) {
-      setCurrentProfile({ ...currentProfile, ...updates })
+      setCurrentProfile({ ...currentProfile, ...updates, isAdmin: currentProfile.isAdmin })
     }
   }
 
   const deleteProfile = (id: string) => {
+    const profileToDelete = profiles.find(p => p.id === id)
+    // Prevent deleting admin if they're the only profile or if there are other profiles
+    if (profileToDelete?.isAdmin && profiles.length > 1) {
+      throw new Error('Cannot delete admin profile while other profiles exist')
+    }
+    
     setProfiles(profiles.filter(p => p.id !== id))
     if (currentProfile?.id === id) {
       setCurrentProfile(null)
@@ -98,6 +121,17 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     // Clear profile-specific data
     localStorage.removeItem(`vaulted_watchlist_${id}`)
     localStorage.removeItem(`vaulted_progress_${id}`)
+  }
+
+  const deleteOwnProfile = (passcode: string): boolean => {
+    if (!currentProfile) return false
+    if (currentProfile.passcode !== passcode) return false
+    if (currentProfile.isAdmin && profiles.length > 1) {
+      throw new Error('Admin cannot delete their profile while other profiles exist')
+    }
+    
+    deleteProfile(currentProfile.id)
+    return true
   }
 
   const selectProfile = (id: string, passcode: string): boolean => {
@@ -134,7 +168,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       loading,
       createProfile, 
       editProfile, 
-      deleteProfile, 
+      deleteProfile,
+      deleteOwnProfile, 
       selectProfile, 
       lockProfile,
       updateSettings

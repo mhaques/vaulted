@@ -3,7 +3,7 @@ import { useProfile, AVATAR_OPTIONS, Profile } from '../contexts/ProfileContext'
 import { IconCheck, IconX, IconLoader, IconLock, IconTrash, IconEdit } from '../components/Icons'
 
 export function Profiles() {
-  const { profiles, createProfile, editProfile, deleteProfile, selectProfile } = useProfile()
+  const { profiles, currentProfile, createProfile, editProfile, deleteProfile, deleteOwnProfile, selectProfile } = useProfile()
   const [mode, setMode] = useState<'select' | 'create' | 'edit'>('select')
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null)
   const [name, setName] = useState('')
@@ -12,6 +12,8 @@ export function Profiles() {
   const [passcodeInput, setPasscodeInput] = useState('')
   const [error, setError] = useState('')
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null)
+  const [showDeleteOwnProfile, setShowDeleteOwnProfile] = useState(false)
+  const [deletePasscode, setDeletePasscode] = useState('')
 
   const handleCreateProfile = () => {
     if (!name.trim()) {
@@ -19,14 +21,22 @@ export function Profiles() {
       return
     }
     if (passcode.length < 4) {
-      setError('Passcode must be at least 4 characters')
+      setError('PIN must be at least 4 digits')
       return
     }
-    createProfile(name.trim(), avatar, passcode)
-    setMode('select')
-    setName('')
-    setPasscode('')
-    setError('')
+    if (!/^\d+$/.test(passcode)) {
+      setError('PIN must contain only numbers')
+      return
+    }
+    try {
+      createProfile(name.trim(), avatar, passcode)
+      setMode('select')
+      setName('')
+      setPasscode('')
+      setError('')
+    } catch (err: any) {
+      setError(err.message)
+    }
   }
 
   const handleSelectProfile = (id: string) => {
@@ -64,22 +74,60 @@ export function Profiles() {
     }
     if (passcode) {
       if (passcode.length < 4) {
-        setError('Passcode must be at least 4 characters')
+        setError('PIN must be at least 4 digits')
+        return
+      }
+      if (!/^\d+$/.test(passcode)) {
+        setError('PIN must contain only numbers')
         return
       }
       updates.passcode = passcode
     }
-    editProfile(editingProfile.id, updates)
-    setMode('select')
-    setEditingProfile(null)
-    setName('')
-    setPasscode('')
-    setError('')
+    try {
+      editProfile(editingProfile.id, updates)
+      setMode('select')
+      setEditingProfile(null)
+      setName('')
+      setPasscode('')
+      setError('')
+    } catch (err: any) {
+      setError(err.message)
+    }
   }
 
   const handleDeleteProfile = (id: string) => {
-    if (confirm('Are you sure you want to delete this profile? All saved data will be lost.')) {
-      deleteProfile(id)
+    const profileToDelete = profiles.find(p => p.id === id)
+    if (!profileToDelete) return
+    
+    // Only admin can delete other profiles
+    if (!currentProfile?.isAdmin && id !== currentProfile?.id) {
+      setError('Only admin can delete profiles')
+      return
+    }
+    
+    if (confirm(`Are you sure you want to delete ${profileToDelete.name}'s profile? All saved data will be lost.`)) {
+      try {
+        deleteProfile(id)
+      } catch (err: any) {
+        setError(err.message)
+      }
+    }
+  }
+
+  const handleDeleteOwnProfile = () => {
+    if (!deletePasscode) {
+      setError('Please enter your PIN')
+      return
+    }
+    try {
+      const success = deleteOwnProfile(deletePasscode)
+      if (!success) {
+        setError('Incorrect PIN')
+        setDeletePasscode('')
+      }
+    } catch (err: any) {
+      setError(err.message)
+      setDeletePasscode('')
     }
   }
 
@@ -112,13 +160,14 @@ export function Profiles() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-neutral-300 mb-2">
-                  <IconLock size={14} className="inline mr-1" /> Enter Passcode
+                  <IconLock size={14} className="inline mr-1" /> Enter PIN
                 </label>
                 <input
                   type="password"
                   inputMode="numeric"
+                  pattern="[0-9]*"
                   value={passcodeInput}
-                  onChange={(e) => setPasscodeInput(e.target.value)}
+                  onChange={(e) => setPasscodeInput(e.target.value.replace(/\D/g, ''))}
                   onKeyDown={(e) => e.key === 'Enter' && handleUnlockProfile()}
                   placeholder="••••"
                   className="w-full px-4 py-3 bg-neutral-800/50 border border-neutral-700 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-center text-2xl tracking-widest"
@@ -203,14 +252,15 @@ export function Profiles() {
 
               <div>
                 <label className="block text-sm font-medium text-neutral-300 mb-2">
-                  {mode === 'edit' ? 'New Passcode (leave empty to keep current)' : 'Passcode'}
+                  {mode === 'edit' ? 'New PIN (leave empty to keep current)' : 'PIN (numbers only)'}
                 </label>
                 <input
                   type="password"
                   inputMode="numeric"
+                  pattern="[0-9]*"
                   value={passcode}
-                  onChange={(e) => setPasscode(e.target.value)}
-                  placeholder={mode === 'edit' ? 'Leave empty to keep current' : 'Min 4 characters'}
+                  onChange={(e) => setPasscode(e.target.value.replace(/\D/g, ''))}
+                  placeholder={mode === 'edit' ? 'Leave empty to keep current' : 'Min 4 digits'}
                   className="w-full px-4 py-3 bg-neutral-800/50 border border-neutral-700 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   maxLength={10}
                 />
@@ -244,40 +294,61 @@ export function Profiles() {
         <p className="text-neutral-400 text-center mb-12">Who's watching?</p>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
-          {profiles.map((profile) => (
-            <div key={profile.id} className="group relative">
-              <button
-                onClick={() => handleSelectProfile(profile.id)}
-                className="w-full aspect-square rounded-2xl bg-neutral-900/50 hover:bg-neutral-800/50 border-2 border-neutral-800 hover:border-indigo-500 transition flex flex-col items-center justify-center p-6 shadow-xl hover:shadow-2xl hover:scale-105"
-              >
-                <div className="text-6xl mb-3">{profile.avatar}</div>
-                <span className="text-white font-medium text-lg">{profile.name}</span>
-              </button>
-              
-              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition flex gap-2">
+          {profiles.map((profile) => {
+            const isActive = currentProfile?.id === profile.id
+            const canDelete = currentProfile?.isAdmin || profile.id === currentProfile?.id
+            
+            return (
+              <div key={profile.id} className="group relative">
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleEditProfile(profile)
-                  }}
-                  className="p-2 bg-neutral-800/90 hover:bg-indigo-600 rounded-lg transition"
-                  title="Edit profile"
+                  onClick={() => handleSelectProfile(profile.id)}
+                  className={`w-full aspect-square rounded-2xl bg-neutral-900/50 hover:bg-neutral-800/50 border-2 transition flex flex-col items-center justify-center p-6 shadow-xl hover:shadow-2xl hover:scale-105 ${
+                    isActive 
+                      ? 'border-green-500 ring-2 ring-green-500/50' 
+                      : 'border-neutral-800 hover:border-indigo-500'
+                  }`}
                 >
-                  <IconEdit size={16} className="text-white" />
+                  <div className="text-6xl mb-3">{profile.avatar}</div>
+                  <span className="text-white font-medium text-lg">{profile.name}</span>
+                  {profile.isAdmin && (
+                    <span className="mt-2 px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded-full border border-yellow-500/30">
+                      Admin
+                    </span>
+                  )}
+                  {isActive && (
+                    <span className="mt-2 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full border border-green-500/30">
+                      Active
+                    </span>
+                  )}
                 </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDeleteProfile(profile.id)
-                  }}
-                  className="p-2 bg-neutral-800/90 hover:bg-red-600 rounded-lg transition"
-                  title="Delete profile"
-                >
-                  <IconTrash size={16} className="text-white" />
-                </button>
+                
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition flex gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleEditProfile(profile)
+                    }}
+                    className="p-2 bg-neutral-800/90 hover:bg-indigo-600 rounded-lg transition"
+                    title="Edit profile"
+                  >
+                    <IconEdit size={16} className="text-white" />
+                  </button>
+                  {canDelete && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteProfile(profile.id)
+                      }}
+                      className="p-2 bg-neutral-800/90 hover:bg-red-600 rounded-lg transition"
+                      title={currentProfile?.isAdmin ? 'Delete profile' : 'Delete your profile'}
+                    >
+                      <IconTrash size={16} className="text-white" />
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
 
           {profiles.length < 8 && (
             <button
@@ -291,7 +362,7 @@ export function Profiles() {
         </div>
 
         <div className="text-center text-neutral-500 text-sm">
-          <IconLock size={14} className="inline mr-1" /> Each profile is protected with a passcode
+          <IconLock size={14} className="inline mr-1" /> Each profile is protected with a PIN (numbers only)
         </div>
       </div>
     </div>
