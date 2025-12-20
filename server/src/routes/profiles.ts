@@ -116,8 +116,10 @@ export default async function profileRoutes(fastify: FastifyInstance) {
   // Delete a profile
   fastify.delete<{
     Params: { id: string }
+    Querystring: { currentProfileId?: string }
   }>('/profiles/:id', async (request, reply) => {
     const profileId = parseInt(request.params.id)
+    const currentProfileId = request.query.currentProfileId ? parseInt(request.query.currentProfileId) : null
 
     // Check if profile exists
     const profile = db.prepare('SELECT * FROM profiles WHERE id = ?').get(profileId) as any
@@ -125,12 +127,20 @@ export default async function profileRoutes(fastify: FastifyInstance) {
       return reply.code(404).send({ error: 'Profile not found' })
     }
 
-    // Check if current profile is admin
-    const adminProfile = db.prepare('SELECT id FROM profiles WHERE is_admin = 1').get() as any
+    // Get current profile to check if admin
+    const currentProfile = currentProfileId 
+      ? db.prepare('SELECT * FROM profiles WHERE id = ?').get(currentProfileId) as any
+      : null
+
+    if (!currentProfile) {
+      return reply.code(401).send({ error: 'Must be logged in to delete profiles' })
+    }
     
     // Only admin can delete other profiles, or users can delete their own
-    const currentProfileId = (request.query as any).currentProfileId
-    if (profile.id !== parseInt(currentProfileId) && (!adminProfile || adminProfile.id !== parseInt(currentProfileId))) {
+    const isDeletingOwn = profile.id === currentProfileId
+    const isCurrentAdmin = currentProfile.is_admin === 1
+
+    if (!isDeletingOwn && !isCurrentAdmin) {
       return reply.code(403).send({ error: 'Only admin can delete other profiles' })
     }
 

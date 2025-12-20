@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { sourceAggregator } from '../services/sources'
 import { getOpenSubtitlesApiKey, setOpenSubtitlesApiKey } from '../services/subtitles'
 import { IconPlay, IconZap, IconSubtitles, IconDisc, IconSettings, IconCheck, IconInfo } from '../components/Icons'
@@ -119,6 +120,27 @@ export function Settings() {
     <div className="p-4 md:p-8 max-w-2xl mx-auto">
       <h1 className="text-3xl font-bold mb-2">Settings</h1>
       <p className="text-neutral-400 mb-8">Configure playback and source preferences.</p>
+
+      {/* Profile Management */}
+      <section className="mb-10">
+        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <IconSettings className="text-indigo-400" size={18} />
+          Profile Management
+        </h2>
+        
+        <div className="p-4 bg-white/5 rounded-lg">
+          <Link 
+            to="/profiles" 
+            className="flex items-center justify-between group hover:bg-white/5 p-3 -m-3 rounded-lg transition"
+          >
+            <div>
+              <p className="font-medium">Manage Profiles</p>
+              <p className="text-sm text-neutral-500">Create, edit, or delete profiles</p>
+            </div>
+            <span className="text-indigo-400 group-hover:translate-x-1 transition-transform">→</span>
+          </Link>
+        </div>
+      </section>
 
       {/* Playback Settings */}
       <section className="mb-10">

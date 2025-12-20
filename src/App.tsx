@@ -11,6 +11,7 @@ import { Contact } from './pages/Contact'
 import { Settings } from './pages/Settings'
 import LiveTV from './pages/LiveTV'
 import { Profiles } from './pages/Profiles'
+import { ProfileManagement } from './pages/ProfileManagement'
 
 function AppRoutes() {
   const { currentProfile, loading: profileLoading } = useProfile()
@@ -40,6 +41,7 @@ function AppRoutes() {
         <Route path="/live" element={<LiveTV />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/profiles" element={<ProfileManagement />} />
       </Routes>
     </Layout>
   )
