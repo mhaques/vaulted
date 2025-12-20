@@ -39,15 +39,11 @@ const AVATAR_OPTIONS = [
 export { AVATAR_OPTIONS }
 
 export function ProfileProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth()
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [currentProfile, setCurrentProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Helper to get auth token
-  const getToken = () => localStorage.getItem('vaulted_token')
-
-  // Load profiles from API when user logs in
+  // Load profiles from API on mount
   useEffect(() => {
     async function loadProfiles() {
       if (!user) {
