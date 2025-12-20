@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.js'
 import watchlistRoutes from './routes/watchlist.js'
 import progressRoutes from './routes/progress.js'
 import proxyRoutes from './routes/proxy.js'
+import profileRoutes from './routes/profiles.js'
 
 const server = Fastify({
   logger: true,
@@ -42,6 +43,7 @@ await server.register(authRoutes, { prefix: '/api/auth' })
 await server.register(watchlistRoutes, { prefix: '/api/watchlist' })
 await server.register(progressRoutes, { prefix: '/api/progress' })
 await server.register(proxyRoutes, { prefix: '/api/proxy' })
+await server.register(profileRoutes, { prefix: '/api' })
 
 // Health check
 server.get('/api/health', async () => {

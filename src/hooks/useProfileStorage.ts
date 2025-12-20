@@ -1,4 +1,7 @@
 import { useProfile } from '../contexts/ProfileContext'
+import { useState, useEffect } from 'react'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3456'
 
 interface WatchlistItem {
   media_type: string
@@ -24,66 +27,145 @@ interface ProgressItem {
 
 export function useProfileStorage() {
   const { currentProfile } = useProfile()
+  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([])
+  const [progress, setProgress] = useState<ProgressItem[]>([])
+
+  const getToken = () => localStorage.getItem('vaulted_token')
+
+  // Load watchlist from API
+  useEffect(() => {
+    async function loadWatchlist() {
+      if (!currentProfile) {
+        setWatchlist([])
+        return
+      }
+
+      try {
+        const token = getToken()
+        const res = await fetch(`${API_URL}/api/profiles/${currentProfile.id}/watchlist`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setWatchlist(data)
+        }
+      } catch (err) {
+        console.error('Failed to load watchlist:', err)
+      }
+    }
+
+    loadWatchlist()
+  }, [currentProfile])
+
+  // Load progress from API
+  useEffect(() => {
+    async function loadProgress() {
+      if (!currentProfile) {
+        setProgress([])
+        return
+      }
+
+      try {
+        const token = getToken()
+        const res = await fetch(`${API_URL}/api/profiles/${currentProfile.id}/progress`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setProgress(data)
+        }
+      } catch (err) {
+        console.error('Failed to load progress:', err)
+      }
+    }
+
+    loadProgress()
+  }, [currentProfile])
 
   const getWatchlist = (): WatchlistItem[] => {
-    if (!currentProfile) return []
-    const key = `vaulted_watchlist_${currentProfile.id}`
-    const stored = localStorage.getItem(key)
-    return stored ? JSON.parse(stored) : []
+    return watchlist
   }
 
-  const addToWatchlist = (item: Omit<WatchlistItem, 'added_at'>) => {
+  const addToWatchlist = async (item: Omit<WatchlistItem, 'added_at'>) => {
     if (!currentProfile) return
-    const key = `vaulted_watchlist_${currentProfile.id}`
-    const current = getWatchlist()
-    const exists = current.find(i => i.media_type === item.media_type && i.media_id === item.media_id)
-    if (!exists) {
-      const updated = [...current, { ...item, added_at: Date.now() }]
-      localStorage.setItem(key, JSON.stringify(updated))
+
+    try {
+      const token = getToken()
+      const res = await fetch(`${API_URL}/api/profiles/${currentProfile.id}/watchlist`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(item)
+      })
+
+      if (res.ok) {
+        // Reload watchlist
+        const newList = await fetch(`${API_URL}/api/profiles/${currentProfile.id}/watchlist`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).then(r => r.json())
+        setWatchlist(newList)
+      }
+    } catch (err) {
+      console.error('Failed to add to watchlist:', err)
     }
   }
 
-  const removeFromWatchlist = (mediaType: string, mediaId: number) => {
+  const removeFromWatchlist = async (mediaType: string, mediaId: number) => {
     if (!currentProfile) return
-    const key = `vaulted_watchlist_${currentProfile.id}`
-    const current = getWatchlist()
-    const updated = current.filter(i => !(i.media_type === mediaType && i.media_id === mediaId))
-    localStorage.setItem(key, JSON.stringify(updated))
+
+    try {
+      const token = getToken()
+      await fetch(`${API_URL}/api/profiles/${currentProfile.id}/watchlist/${mediaType}/${mediaId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      // Update local state
+      setWatchlist(watchlist.filter(i => !(i.media_type === mediaType && i.media_id === mediaId)))
+    } catch (err) {
+      console.error('Failed to remove from watchlist:', err)
+    }
   }
 
   const isInWatchlist = (mediaType: string, mediaId: number): boolean => {
-    const watchlist = getWatchlist()
     return watchlist.some(i => i.media_type === mediaType && i.media_id === mediaId)
   }
 
   const getProgress = (): ProgressItem[] => {
-    if (!currentProfile) return []
-    const key = `vaulted_progress_${currentProfile.id}`
-    const stored = localStorage.getItem(key)
-    return stored ? JSON.parse(stored) : []
+    return progress
   }
 
-  const saveProgress = (item: Omit<ProgressItem, 'updated_at'>) => {
+  const saveProgress = async (item: Omit<ProgressItem, 'updated_at'>) => {
     if (!currentProfile) return
-    const key = `vaulted_progress_${currentProfile.id}`
-    const current = getProgress()
-    
-    // Remove old entry for this item
-    const filtered = current.filter(i => {
-      if (i.media_type !== item.media_type || i.media_id !== item.media_id) return true
-      if (item.season !== undefined && item.episode !== undefined) {
-        return !(i.season === item.season && i.episode === item.episode)
-      }
-      return false
-    })
-    
-    // Add new entry
-    const updated = [...filtered, { ...item, updated_at: Date.now() }]
-    localStorage.setItem(key, JSON.stringify(updated))
+
+    try {
+      const token = getToken()
+      await fetch(`${API_URL}/api/profiles/${currentProfile.id}/progress`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(item)
+      })
+
+      // Update local state
+      const filtered = progress.filter(i => {
+        if (i.media_type !== item.media_type || i.media_id !== item.media_id) return true
+        if (item.season !== undefined && item.episode !== undefined) {
+          return !(i.season === item.season && i.episode === item.episode)
+        }
+        return false
+      })
+      setProgress([{ ...item, updated_at: Date.now() }, ...filtered])
+    } catch (err) {
+      console.error('Failed to save progress:', err)
+    }
   }
 
   const getItemProgress = (mediaType: string, mediaId: number, season?: number, episode?: number): ProgressItem | undefined => {
-    const progress = getProgress()
     return progress.find(i => {
       if (i.media_type !== mediaType || i.media_id !== mediaId) return false
       if (season !== undefined && episode !== undefined) {
@@ -93,18 +175,19 @@ export function useProfileStorage() {
     })
   }
 
-  const removeProgress = (mediaType: string, mediaId: number, season?: number, episode?: number) => {
+  const removeProgress = async (mediaType: string, mediaId: number, season?: number, episode?: number) => {
     if (!currentProfile) return
-    const key = `vaulted_progress_${currentProfile.id}`
-    const current = getProgress()
-    const updated = current.filter(i => {
+
+    // For now, just update local state
+    // Could add a DELETE endpoint if needed
+    const updated = progress.filter(i => {
       if (i.media_type !== mediaType || i.media_id !== mediaId) return true
       if (season !== undefined && episode !== undefined) {
         return !(i.season === season && i.episode === episode)
       }
       return false
     })
-    localStorage.setItem(key, JSON.stringify(updated))
+    setProgress(updated)
   }
 
   return {
