@@ -46,21 +46,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   // Load profiles from API on mount
   useEffect(() => {
     async function loadProfiles() {
-      if (!user) {
-        setProfiles([])
-        setCurrentProfile(null)
-        setLoading(false)
-        return
-      }
-
+      console.log('ProfileContext loadProfiles')
       try {
-        const token = getToken()
-        const res = await fetch(`${API_URL}/api/profiles`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        const res = await fetch(`${API_URL}/api/profiles`)
 
         if (res.ok) {
           const data = await res.json()
+          console.log('Loaded profiles:', data.length)
           setProfiles(data)
           
           // Check if there's a current profile in session
@@ -68,6 +60,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           if (currentId) {
             const profile = data.find((p: Profile) => p.id === currentId)
             if (profile) {
+              console.log('Restored profile from session:', profile.name)
               setCurrentProfile(profile)
             }
           }
@@ -75,6 +68,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         console.error('Failed to load profiles:', err)
       } finally {
+        console.log('Setting loading to false')
         setLoading(false)
       }
     }
