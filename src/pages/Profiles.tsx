@@ -295,29 +295,17 @@ export function Profiles() {
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
           {profiles.map((profile) => {
-            const isActive = currentProfile?.id === profile.id
-            const canDelete = currentProfile?.isAdmin || profile.id === currentProfile?.id
-            
             return (
               <div key={profile.id} className="group relative">
                 <button
                   onClick={() => handleSelectProfile(profile.id)}
-                  className={`w-full aspect-square rounded-2xl bg-neutral-900/50 hover:bg-neutral-800/50 border-2 transition flex flex-col items-center justify-center p-6 shadow-xl hover:shadow-2xl hover:scale-105 ${
-                    isActive 
-                      ? 'border-green-500 ring-2 ring-green-500/50' 
-                      : 'border-neutral-800 hover:border-indigo-500'
-                  }`}
+                  className="w-full aspect-square rounded-2xl bg-neutral-900/50 hover:bg-neutral-800/50 border-2 border-neutral-800 hover:border-indigo-500 transition flex flex-col items-center justify-center p-6 shadow-xl hover:shadow-2xl hover:scale-105"
                 >
                   <div className="text-6xl mb-3">{profile.avatar}</div>
                   <span className="text-white font-medium text-lg">{profile.name}</span>
                   {profile.isAdmin && (
                     <span className="mt-2 px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded-full border border-yellow-500/30">
                       Admin
-                    </span>
-                  )}
-                  {isActive && (
-                    <span className="mt-2 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full border border-green-500/30">
-                      Active
                     </span>
                   )}
                 </button>
@@ -328,23 +316,21 @@ export function Profiles() {
                       e.stopPropagation()
                       handleEditProfile(profile)
                     }}
-                    className="p-2 bg-neutral-800/90 hover:bg-indigo-600 rounded-lg transition"
+                    className="p-2 bg-neutral-800/90 hover:bg-indigo-600 rounded-lg transition shadow-lg"
                     title="Edit profile"
                   >
                     <IconEdit size={16} className="text-white" />
                   </button>
-                  {canDelete && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDeleteProfile(profile.id)
-                      }}
-                      className="p-2 bg-neutral-800/90 hover:bg-red-600 rounded-lg transition"
-                      title={currentProfile?.isAdmin ? 'Delete profile' : 'Delete your profile'}
-                    >
-                      <IconTrash size={16} className="text-white" />
-                    </button>
-                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDeleteProfile(profile.id)
+                    }}
+                    className="p-2 bg-neutral-800/90 hover:bg-red-600 rounded-lg transition shadow-lg"
+                    title="Delete profile"
+                  >
+                    <IconTrash size={16} className="text-white" />
+                  </button>
                 </div>
               </div>
             )
