@@ -66,6 +66,7 @@ export function VideoPlayer({
   const [activeSubtitle, setActiveSubtitle] = useState<string | null>(null)
   const [audioTracks, setAudioTracks] = useState<{ id: number; label: string; language: string }[]>([])
   const [activeAudioTrack, setActiveAudioTrack] = useState<number>(0)
+  const [loadingTimeout, setLoadingTimeout] = useState(false)
   const [subtitleSize, setSubtitleSize] = useState(() => {
     const saved = localStorage.getItem('vaulted_subtitle_size')
     return saved ? parseInt(saved) : 100
@@ -247,6 +248,21 @@ export function VideoPlayer({
       }
     }
   }, [isPlaying, onProgress])
+
+  // Detect stuck loading state
+  useEffect(() => {
+    let timeoutId: number
+    if (isLoading && !error) {
+      timeoutId = window.setTimeout(() => {
+        setLoadingTimeout(true)
+      }, 15000) // 15 seconds
+    } else {
+      setLoadingTimeout(false)
+    }
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId)
+    }
+  }, [isLoading, error])
 
   // Auto-hide controls
   useEffect(() => {
@@ -854,6 +870,54 @@ export function VideoPlayer({
       )}
     </div>
   )
+
+  // Loading timeout state
+  if (loadingTimeout && isLoading) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center">
+        <div className="text-center p-8 max-w-md">
+          <div className="text-6xl mb-4">⏱️</div>
+          <h3 className="text-2xl font-bold mb-4">Video Taking Too Long to Load</h3>
+          <p className="text-neutral-400 mb-6">
+            The video is taking longer than expected. This might be due to:
+          </p>
+          <ul className="text-left text-sm text-neutral-400 mb-6 space-y-2">
+            <li>• Slow network connection</li>
+            <li>• Video format not supported on mobile</li>
+            <li>• Server not responding</li>
+          </ul>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => {
+                setLoadingTimeout(false)
+                if (videoRef.current) {
+                  videoRef.current.load()
+                  videoRef.current.play().catch(console.error)
+                }
+              }}
+              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-lg transition"
+            >
+              Retry Loading
+            </button>
+            {onChangeSource && (
+              <button
+                onClick={onChangeSource}
+                className="px-6 py-3 bg-white/10 rounded-lg hover:bg-white/20 transition"
+              >
+                Try Different Source
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="px-6 py-3 bg-white/10 rounded-lg hover:bg-white/20 transition"
+            >
+              Close Player
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (error) {
     return (

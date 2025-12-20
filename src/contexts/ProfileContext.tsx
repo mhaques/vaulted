@@ -55,8 +55,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           console.log('Loaded profiles:', data.length)
           setProfiles(data)
           
-          // Check if there's a current profile in session
-          const currentId = sessionStorage.getItem(CURRENT_PROFILE_KEY)
+          // Check if there's a current profile in localStorage (persists across sessions)
+          const currentId = localStorage.getItem(CURRENT_PROFILE_KEY)
           if (currentId) {
             const profile = data.find((p: Profile) => p.id === currentId)
             if (profile) {
@@ -141,7 +141,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     setProfiles(profiles.filter(p => p.id !== id))
     if (currentProfile?.id === id) {
       setCurrentProfile(null)
-      sessionStorage.removeItem(CURRENT_PROFILE_KEY)
+      localStorage.removeItem(CURRENT_PROFILE_KEY)
     }
   }
 
@@ -171,7 +171,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       const fullProfile = profiles.find(p => p.id === id)
       if (fullProfile) {
         setCurrentProfile({ ...fullProfile, ...profile })
-        sessionStorage.setItem(CURRENT_PROFILE_KEY, id)
+        localStorage.setItem(CURRENT_PROFILE_KEY, id)
         return true
       }
     }
@@ -180,7 +180,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   const lockProfile = () => {
     setCurrentProfile(null)
-    sessionStorage.removeItem(CURRENT_PROFILE_KEY)
+    localStorage.removeItem(CURRENT_PROFILE_KEY)
   }
 
   const updateSettings = (settings: Partial<Profile['settings']>) => {
