@@ -268,10 +268,14 @@ export function VideoPlayer({
   // Fullscreen change listener
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement)
+      setIsFullscreen(!!(document.fullscreenElement || (document as any).webkitFullscreenElement))
     }
     document.addEventListener('fullscreenchange', handleFullscreenChange)
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange)
+    }
   }, [])
 
   // Enable/disable subtitle track
@@ -305,10 +309,26 @@ export function VideoPlayer({
 
   const toggleFullscreen = useCallback(async () => {
     if (!containerRef.current) return
-    if (document.fullscreenElement) {
-      await document.exitFullscreen()
+    
+    const elem = containerRef.current as any
+    const doc = document as any
+    
+    if (document.fullscreenElement || doc.webkitFullscreenElement) {
+      // Exit fullscreen
+      if (document.exitFullscreen) {
+        await document.exitFullscreen()
+      } else if (doc.webkitExitFullscreen) {
+        doc.webkitExitFullscreen()
+      }
     } else {
-      await containerRef.current.requestFullscreen()
+      // Enter fullscreen
+      if (elem.requestFullscreen) {
+        await elem.requestFullscreen()
+      } else if (elem.webkitRequestFullscreen) {
+        elem.webkitRequestFullscreen()
+      } else if (elem.webkitEnterFullscreen) {
+        elem.webkitEnterFullscreen()
+      }
     }
   }, [])
 
@@ -560,14 +580,30 @@ export function VideoPlayer({
           
           <button
             onClick={() => {
-              // Open in native player (works on iOS/Android)
-              window.open(src, '_blank')
+              if (videoRef.current) {
+                // Request fullscreen on the video element itself for native player
+                const video = videoRef.current as any
+                if (video.webkitEnterFullscreen) {
+                  video.webkitEnterFullscreen() // iOS native player
+                } else if (video.requestFullscreen) {
+                  video.requestFullscreen()
+                } else {
+                  // Fallback: create a temporary link and trigger download with proper MIME type
+                  const a = document.createElement('a')
+                  a.href = src
+                  a.download = title || 'video.mp4'
+                  a.target = '_blank'
+                  document.body.appendChild(a)
+                  a.click()
+                  document.body.removeChild(a)
+                }
+              }
             }}
             className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition"
           >
             <div className="flex items-center gap-3">
               <IconPhone size={18} />
-              <span>Open in Native Player</span>
+              <span>Use Native Player</span>
             </div>
           </button>
         </div>
@@ -874,7 +910,11 @@ export function VideoPlayer({
           poster={poster}
           className="w-full h-full object-contain"
           playsInline
+          webkit-playsinline="true"
           crossOrigin="anonymous"
+          controlsList="nodownload"
+          disablePictureInPicture={false}
+          style={{ objectFit: 'contain' }}
         >
           {/* Loaded subtitle from OpenSubtitles */}
           {loadedSubtitleUrl && activeSubtitle && (
@@ -1007,33 +1047,33 @@ export function VideoPlayer({
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-2 md:gap-0">
+            <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto justify-between md:justify-start">
               {/* Play/Pause */}
-              <button onClick={togglePlay} className="hover:text-indigo-400 transition p-2">
+              <button onClick={togglePlay} className="hover:text-indigo-400 transition p-2 touch-manipulation">
                 {isPlaying ? <IconPause size={24} /> : <IconPlay size={24} />}
               </button>
 
               {/* Skip buttons */}
               <button 
                 onClick={() => videoRef.current && (videoRef.current.currentTime -= 10)}
-                className="hover:text-indigo-400 transition p-2 text-sm flex items-center gap-1"
+                className="hover:text-indigo-400 transition p-2 text-sm flex items-center gap-1 touch-manipulation"
                 title="Rewind 10s (J)"
               >
                 <IconSkipBack size={16} />
-                <span className="text-xs">10</span>
+                <span className="text-xs hidden sm:inline">10</span>
               </button>
               <button 
                 onClick={() => videoRef.current && (videoRef.current.currentTime += 10)}
-                className="hover:text-indigo-400 transition p-2 text-sm flex items-center gap-1"
+                className="hover:text-indigo-400 transition p-2 text-sm flex items-center gap-1 touch-manipulation"
                 title="Forward 10s (L)"
               >
-                <span className="text-xs">10</span>
+                <span className="text-xs hidden sm:inline">10</span>
                 <IconSkipForward size={16} />
               </button>
 
               {/* Volume */}
-              <div className="flex items-center group/vol">
+              <div className="hidden md:flex items-center group/vol">
                 <button onClick={() => setIsMuted(m => !m)} className="hover:text-indigo-400 transition p-2">
                   {isMuted || volume === 0 ? <IconVolumeMute size={20} /> : volume < 0.5 ? <IconVolumeLow size={20} /> : <IconVolume size={20} />}
                 </button>
@@ -1054,19 +1094,19 @@ export function VideoPlayer({
               </div>
 
               {/* Time */}
-              <span className="text-sm text-neutral-300 tabular-nums">
+              <span className="text-xs md:text-sm text-neutral-300 tabular-nums">
                 {formatTime(currentTime)} / {formatTime(duration)}
               </span>
 
               {/* Speed indicator */}
               {playbackSpeed !== 1 && (
-                <span className="text-xs bg-indigo-500/30 text-indigo-300 px-2 py-1 rounded">
+                <span className="hidden sm:inline text-xs bg-indigo-500/30 text-indigo-300 px-2 py-1 rounded">
                   {playbackSpeed}x
                 </span>
               )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 md:gap-2">
               {/* Subtitles toggle */}
               <button 
                 onClick={() => {
