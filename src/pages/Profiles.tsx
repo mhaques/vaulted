@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import { useProfile, AVATAR_OPTIONS, Profile } from '../contexts/ProfileContext'
-import { useAuth } from '../contexts/AuthContext'
 import { IconCheck, IconX, IconLoader, IconLock, IconTrash, IconEdit } from '../components/Icons'
 
 export function Profiles() {
-  const { user, login, register } = useAuth()
   const { profiles, currentProfile, createProfile, editProfile, deleteProfile, deleteOwnProfile, selectProfile } = useProfile()
   const [mode, setMode] = useState<'select' | 'create' | 'edit'>('select')
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null)
@@ -16,137 +14,6 @@ export function Profiles() {
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null)
   const [showDeleteOwnProfile, setShowDeleteOwnProfile] = useState(false)
   const [deletePasscode, setDeletePasscode] = useState('')
-  
-  // Auth state
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [authError, setAuthError] = useState('')
-  const [authLoading, setAuthLoading] = useState(false)
-
-  const handleLogin = async () => {
-    if (!email || !password) {
-      setAuthError('Please fill in all fields')
-      return
-    }
-    setAuthLoading(true)
-    setAuthError('')
-    try {
-      await login(email, password)
-    } catch (err: any) {
-      setAuthError(err.message || 'Login failed')
-    } finally {
-      setAuthLoading(false)
-    }
-  }
-
-  const handleRegister = async () => {
-    if (!email || !password) {
-      setAuthError('Please fill in all fields')
-      return
-    }
-    if (password.length < 6) {
-      setAuthError('Password must be at least 6 characters')
-      return
-    }
-    setAuthLoading(true)
-    setAuthError('')
-    try {
-      await register(email, password)
-    } catch (err: any) {
-      setAuthError(err.message || 'Registration failed')
-    } finally {
-      setAuthLoading(false)
-    }
-  }
-
-  // Show login/register form if not logged in
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-8">
-            <img src="/logo.svg" alt="Vaulted" className="w-16 h-16 mx-auto mb-4" />
-            <h1 className="text-4xl font-bold text-white mb-2">Vaulted</h1>
-            <p className="text-neutral-400">Your Personal Media Portal</p>
-          </div>
-
-          <div className="bg-neutral-900/50 backdrop-blur-xl border border-neutral-800 rounded-2xl p-8 shadow-2xl">
-            <div className="flex gap-2 mb-6">
-              <button
-                onClick={() => {
-                  setAuthMode('login')
-                  setAuthError('')
-                }}
-                className={`flex-1 py-2 rounded-lg font-medium transition ${
-                  authMode === 'login'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-neutral-800 text-neutral-400 hover:text-white'
-                }`}
-              >
-                Login
-              </button>
-              <button
-                onClick={() => {
-                  setAuthMode('register')
-                  setAuthError('')
-                }}
-                className={`flex-1 py-2 rounded-lg font-medium transition ${
-                  authMode === 'register'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-neutral-800 text-neutral-400 hover:text-white'
-                }`}
-              >
-                Register
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-neutral-300 mb-2">Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && (authMode === 'login' ? handleLogin() : handleRegister())}
-                  placeholder="Enter your email"
-                  className="w-full px-4 py-3 bg-neutral-800/50 border border-neutral-700 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  autoFocus
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-neutral-300 mb-2">Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && (authMode === 'login' ? handleLogin() : handleRegister())}
-                  placeholder="Enter your password"
-                  className="w-full px-4 py-3 bg-neutral-800/50 border border-neutral-700 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              {authError && (
-                <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm">
-                  {authError}
-                </div>
-              )}
-
-              <button
-                onClick={authMode === 'login' ? handleLogin : handleRegister}
-                disabled={authLoading || !email || !password}
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-neutral-700 disabled:to-neutral-700 text-white font-medium py-3 rounded-xl transition shadow-lg disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {authLoading && <IconLoader size={18} className="animate-spin" />}
-                {authMode === 'login' ? 'Login' : 'Create Account'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   const handleCreateProfile = async () => {
     if (!name.trim()) {

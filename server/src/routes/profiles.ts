@@ -2,19 +2,13 @@ import { FastifyInstance } from 'fastify'
 import db from '../db.js'
 
 export default async function profileRoutes(fastify: FastifyInstance) {
-  // Get all profiles for the logged-in user
+  // Get all profiles
   fastify.get('/profiles', async (request, reply) => {
-    const userId = (request.user as any)?.id
-    if (!userId) {
-      return reply.code(401).send({ error: 'Unauthorized' })
-    }
-
     const profiles = db.prepare(`
       SELECT id, name, avatar, passcode, is_admin as isAdmin, created_at as createdAt
       FROM profiles
-      WHERE user_id = ?
       ORDER BY created_at ASC
-    `).all(userId)
+    `).all()
 
     return profiles
   })
@@ -23,11 +17,6 @@ export default async function profileRoutes(fastify: FastifyInstance) {
   fastify.post<{
     Body: { name: string; avatar: string; passcode: string }
   }>('/profiles', async (request, reply) => {
-    const userId = (request.user as any)?.id
-    if (!userId) {
-      return reply.code(401).send({ error: 'Unauthorized' })
-    }
-
     const { name, avatar, passcode } = request.body
 
     if (!name || !avatar || !passcode) {
@@ -42,8 +31,8 @@ export default async function profileRoutes(fastify: FastifyInstance) {
       return reply.code(400).send({ error: 'PIN must be at least 4 digits' })
     }
 
-    // Check if this is the first profile for this user
-    const existingProfiles = db.prepare('SELECT COUNT(*) as count FROM profiles WHERE user_id = ?').get(userId) as { count: number }
+    // Check if this is the first profile globally
+    const existingProfiles = db.prepare('SELECT COUNT(*) as count FROM profiles').get() as { count: number }
     const isFirstProfile = existingProfiles.count === 0
 
     // Check profile limit (max 8)
@@ -52,9 +41,9 @@ export default async function profileRoutes(fastify: FastifyInstance) {
     }
 
     const result = db.prepare(`
-      INSERT INTO profiles (user_id, name, avatar, passcode, is_admin)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(userId, name, avatar, passcode, isFirstProfile ? 1 : 0)
+      INSERT INTO profiles (name, avatar, passcode, is_admin)
+      VALUES (?, ?, ?, ?)
+    `).run(name, avatar, passcode, isFirstProfile ? 1 : 0)
 
     const profile = db.prepare(`
       SELECT id, name, avatar, passcode, is_admin as isAdmin, created_at as createdAt
@@ -70,16 +59,11 @@ export default async function profileRoutes(fastify: FastifyInstance) {
     Params: { id: string }
     Body: { name?: string; avatar?: string; passcode?: string }
   }>('/profiles/:id', async (request, reply) => {
-    const userId = (request.user as any)?.id
-    if (!userId) {
-      return reply.code(401).send({ error: 'Unauthorized' })
-    }
-
     const profileId = parseInt(request.params.id)
     const { name, avatar, passcode } = request.body
 
-    // Check if profile belongs to this user
-    const profile = db.prepare('SELECT * FROM profiles WHERE id = ? AND user_id = ?').get(profileId, userId)
+    // Check if profile exists
+    const profile = db.prepare('SELECT * FROM profiles WHERE id = ?').get(profileId)
     if (!profile) {
       return reply.code(404).send({ error: 'Profile not found' })
     }
@@ -133,21 +117,16 @@ export default async function profileRoutes(fastify: FastifyInstance) {
   fastify.delete<{
     Params: { id: string }
   }>('/profiles/:id', async (request, reply) => {
-    const userId = (request.user as any)?.id
-    if (!userId) {
-      return reply.code(401).send({ error: 'Unauthorized' })
-    }
-
     const profileId = parseInt(request.params.id)
 
-    // Check if profile belongs to this user
-    const profile = db.prepare('SELECT * FROM profiles WHERE id = ? AND user_id = ?').get(profileId, userId) as any
+    // Check if profile exists
+    const profile = db.prepare('SELECT * FROM profiles WHERE id = ?').get(profileId) as any
     if (!profile) {
       return reply.code(404).send({ error: 'Profile not found' })
     }
 
-    // Check if user is admin of this account
-    const adminProfile = db.prepare('SELECT id FROM profiles WHERE user_id = ? AND is_admin = 1').get(userId) as any
+    // Check if current profile is admin
+    const adminProfile = db.prepare('SELECT id FROM profiles WHERE is_admin = 1').get() as any
     
     // Only admin can delete other profiles, or users can delete their own
     const currentProfileId = (request.query as any).currentProfileId
@@ -157,7 +136,7 @@ export default async function profileRoutes(fastify: FastifyInstance) {
 
     // Prevent deleting admin if other profiles exist
     if (profile.is_admin) {
-      const otherProfiles = db.prepare('SELECT COUNT(*) as count FROM profiles WHERE user_id = ? AND id != ?').get(userId, profileId) as { count: number }
+      const otherProfiles = db.prepare('SELECT COUNT(*) as count FROM profiles WHERE id != ?').get(profileId) as { count: number }
       if (otherProfiles.count > 0) {
         return reply.code(400).send({ error: 'Cannot delete admin profile while other profiles exist' })
       }
@@ -174,19 +153,14 @@ export default async function profileRoutes(fastify: FastifyInstance) {
     Params: { id: string }
     Body: { passcode: string }
   }>('/profiles/:id/verify', async (request, reply) => {
-    const userId = (request.user as any)?.id
-    if (!userId) {
-      return reply.code(401).send({ error: 'Unauthorized' })
-    }
-
     const profileId = parseInt(request.params.id)
     const { passcode } = request.body
 
     const profile = db.prepare(`
       SELECT id, name, avatar, is_admin as isAdmin
       FROM profiles
-      WHERE id = ? AND user_id = ? AND passcode = ?
-    `).get(profileId, userId, passcode)
+      WHERE id = ? AND passcode = ?
+    `).get(profileId, passcode)
 
     if (!profile) {
       return reply.code(401).send({ error: 'Invalid PIN' })

@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { useAuth } from './AuthContext'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3456'
 
@@ -85,7 +84,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
 
     loadProfiles()
-  }, [user])
+  }, [])
 
   const createProfile = async (name: string, avatar: string, passcode: string) => {
     // Validate passcode is numbers only
@@ -93,12 +92,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       throw new Error('Passcode must contain only numbers')
     }
     
-    const token = getToken()
     const res = await fetch(`${API_URL}/api/profiles`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ name, avatar, passcode })
     })
@@ -119,12 +116,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       throw new Error('Passcode must contain only numbers')
     }
     
-    const token = getToken()
     const res = await fetch(`${API_URL}/api/profiles/${id}`, {
       method: 'PATCH',
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(updates)
     })
@@ -144,10 +139,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }
 
   const deleteProfile = async (id: string) => {
-    const token = getToken()
     const res = await fetch(`${API_URL}/api/profiles/${id}?currentProfileId=${currentProfile?.id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` }
+      method: 'DELETE'
     })
 
     if (!res.ok) {
@@ -175,12 +168,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }
 
   const selectProfile = async (id: string, passcode: string): Promise<boolean> => {
-    const token = getToken()
     const res = await fetch(`${API_URL}/api/profiles/${id}/verify`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ passcode })
     })

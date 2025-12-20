@@ -68,13 +68,11 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS profiles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     avatar TEXT NOT NULL,
     passcode TEXT NOT NULL,
     is_admin INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    created_at TEXT DEFAULT (datetime('now'))
   );
 
   CREATE TABLE IF NOT EXISTS profile_watchlist (
@@ -108,7 +106,6 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_watchlist_user ON watchlist(user_id);
   CREATE INDEX IF NOT EXISTS idx_progress_user ON watch_progress(user_id);
   CREATE INDEX IF NOT EXISTS idx_history_user ON watch_history(user_id);
-  CREATE INDEX IF NOT EXISTS idx_profiles_user ON profiles(user_id);
   CREATE INDEX IF NOT EXISTS idx_profile_watchlist ON profile_watchlist(profile_id);
   CREATE INDEX IF NOT EXISTS idx_profile_progress ON profile_progress(profile_id);
 `)
