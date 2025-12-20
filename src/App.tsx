@@ -25,8 +25,10 @@ function AppRoutes() {
     )
   }
 
-  // Show profile selection if logged in but no profile selected
-  if (user && !currentProfile) {
+  // Show Profiles page if:
+  // 1. No user (shows login/register)
+  // 2. User logged in but no profile selected (shows profile selection)
+  if (!user || !currentProfile) {
     return <Profiles />
   }
 
