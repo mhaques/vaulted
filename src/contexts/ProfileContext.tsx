@@ -30,6 +30,7 @@ interface ProfileContextType {
 const ProfileContext = createContext<ProfileContextType | null>(null)
 
 const CURRENT_PROFILE_KEY = 'vaulted_current_profile'
+const PROFILE_AUTH_KEY = 'vaulted_profile_auth'
 
 const AVATAR_OPTIONS = [
   '🎬', '🎥', '📺', '🎭', '🎪', '🎨', '🎯', '🎮', '🎲', '🎰',
@@ -57,11 +58,16 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           
           // Check if there's a current profile in localStorage (persists across sessions)
           const currentId = localStorage.getItem(CURRENT_PROFILE_KEY)
-          if (currentId) {
+          const authToken = localStorage.getItem(PROFILE_AUTH_KEY)
+          if (currentId && authToken) {
             const profile = data.find((p: Profile) => p.id === currentId)
             if (profile) {
-              console.log('Restored profile from session:', profile.name)
+              console.log('Restored profile from localStorage:', profile.name)
               setCurrentProfile(profile)
+            } else {
+              // Profile no longer exists, clear storage
+              localStorage.removeItem(CURRENT_PROFILE_KEY)
+              localStorage.removeItem(PROFILE_AUTH_KEY)
             }
           }
         }
@@ -142,6 +148,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     if (currentProfile?.id === id) {
       setCurrentProfile(null)
       localStorage.removeItem(CURRENT_PROFILE_KEY)
+      localStorage.removeItem(PROFILE_AUTH_KEY)
     }
   }
 
@@ -172,6 +179,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       if (fullProfile) {
         setCurrentProfile({ ...fullProfile, ...profile })
         localStorage.setItem(CURRENT_PROFILE_KEY, id)
+        localStorage.setItem(PROFILE_AUTH_KEY, 'authenticated')
         return true
       }
     }
@@ -181,6 +189,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const lockProfile = () => {
     setCurrentProfile(null)
     localStorage.removeItem(CURRENT_PROFILE_KEY)
+    localStorage.removeItem(PROFILE_AUTH_KEY)
   }
 
   const updateSettings = (settings: Partial<Profile['settings']>) => {

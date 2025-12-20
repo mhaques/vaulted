@@ -166,6 +166,12 @@ export function VideoPlayer({
     const handleCanPlay = () => {
       setIsLoading(false)
     }
+    
+    const handleCanPlayThrough = () => {
+      // Video can play through without buffering
+      setIsLoading(false)
+      console.log('Video ready - can play through')
+    }
 
     const handleWaiting = () => {
       setIsLoading(true)
@@ -201,14 +207,38 @@ export function VideoPlayer({
 
     const handleError = (e: Event) => {
       const videoEl = e.target as HTMLVideoElement
-      console.error('Video error:', videoEl.error?.code, videoEl.error?.message)
-      setError(`Failed to load video: ${videoEl.error?.message || 'Unknown error'}`)
+      const errorCode = videoEl.error?.code
+      const errorMsg = videoEl.error?.message
+      
+      console.error('Video error:', errorCode, errorMsg)
+      console.error('Video source:', src)
+      console.error('Video readyState:', videoEl.readyState)
+      console.error('Video networkState:', videoEl.networkState)
+      
+      let userMessage = 'Failed to load video'
+      
+      // Detect common mobile playback issues
+      if (errorCode === 4) {
+        // MEDIA_ERR_SRC_NOT_SUPPORTED
+        userMessage = 'Video format not supported on this device. This often happens with H.265/HEVC videos on mobile. Try a different source.'
+      } else if (errorCode === 3) {
+        // MEDIA_ERR_DECODE
+        userMessage = 'Video cannot be decoded. The video codec may not be supported on this device. Try a different source.'
+      } else if (errorCode === 2) {
+        // MEDIA_ERR_NETWORK
+        userMessage = 'Network error loading video. Check your connection and try again.'
+      } else if (errorMsg) {
+        userMessage = errorMsg
+      }
+      
+      setError(userMessage)
       setIsLoading(false)
       onError?.()
     }
 
     video.addEventListener('loadedmetadata', handleLoadedMetadata)
     video.addEventListener('canplay', handleCanPlay)
+    video.addEventListener('canplaythrough', handleCanPlayThrough)
     video.addEventListener('waiting', handleWaiting)
     video.addEventListener('playing', handlePlaying)
     video.addEventListener('pause', handlePause)
@@ -221,6 +251,7 @@ export function VideoPlayer({
     return () => {
       video.removeEventListener('loadedmetadata', handleLoadedMetadata)
       video.removeEventListener('canplay', handleCanPlay)
+      video.removeEventListener('canplaythrough', handleCanPlayThrough)
       video.removeEventListener('waiting', handleWaiting)
       video.removeEventListener('playing', handlePlaying)
       video.removeEventListener('pause', handlePause)
