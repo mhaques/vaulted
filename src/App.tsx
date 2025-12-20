@@ -1,6 +1,5 @@
 import React from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { ProfileProvider, useProfile } from './contexts/ProfileContext'
 import { Layout } from './Layout'
 import Home from './pages/Home'
@@ -14,10 +13,9 @@ import LiveTV from './pages/LiveTV'
 import { Profiles } from './pages/Profiles'
 
 function AppRoutes() {
-  const { user, loading: authLoading } = useAuth()
   const { currentProfile, loading: profileLoading } = useProfile()
 
-  if (authLoading || profileLoading) {
+  if (profileLoading) {
     return (
       <div className="min-h-screen bg-neutral-950 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent" />
@@ -25,10 +23,8 @@ function AppRoutes() {
     )
   }
 
-  // Show Profiles page if:
-  // 1. No user (shows login/register)
-  // 2. User logged in but no profile selected (shows profile selection)
-  if (!user || !currentProfile) {
+  // Show profile selection if no profile selected
+  if (!currentProfile) {
     return <Profiles />
   }
 
