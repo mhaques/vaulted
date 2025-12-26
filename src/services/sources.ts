@@ -207,9 +207,8 @@ const TORRENTIO_BASE = import.meta.env.DEV
   ? '/torrentio' 
   : 'https://torrentio.strem.fun'
 
-// Torrentio with common indexers configured
-// Config: sort by quality, filter out low quality, English only
-const TORRENTIO_CONFIG = 'sort=qualitysize|qualityfilter=480p,scr,cam|lang=english'
+// Torrentio base config: sort by quality, filter out low quality
+const TORRENTIO_CONFIG_BASE = 'sort=qualitysize|qualityfilter=480p,scr,cam'
 
 interface TorrentioStream {
   name: string
@@ -229,7 +228,14 @@ async function fetchTorrentio(
   season?: number,
   episode?: number
 ): Promise<StreamSource[]> {
-  let url = `${TORRENTIO_BASE}/${TORRENTIO_CONFIG}/stream/${type}/${imdbId}`
+  // Build config - include Real-Debrid key if available
+  // This makes Torrentio return only cached streams with resolve URLs
+  const rdKey = sourceAggregator.getDebridKey()
+  const config = rdKey 
+    ? `${TORRENTIO_CONFIG_BASE}|realdebrid=${rdKey}`
+    : TORRENTIO_CONFIG_BASE
+  
+  let url = `${TORRENTIO_BASE}/${config}/stream/${type}/${imdbId}`
   
   if (type === 'series' && season !== undefined && episode !== undefined) {
     url += `:${season}:${episode}`
@@ -237,7 +243,8 @@ async function fetchTorrentio(
   
   url += '.json'
 
-  console.log('[Torrentio] Fetching:', url)
+  // Log without exposing API key
+  console.log('[Torrentio] Fetching:', url.replace(/realdebrid=[^|/]+/, 'realdebrid=***'))
 
   try {
     const res = await fetch(url)
@@ -247,13 +254,17 @@ async function fetchTorrentio(
     }
     
     const data = await res.json()
-    console.log('[Torrentio] Response:', data)
+    console.log('[Torrentio] Response: streams=', data.streams?.length || 0)
     
     const streams: TorrentioStream[] = data.streams || []
 
     return streams.map((stream, idx) => {
-      // Build magnet URL from infoHash if url not provided
       let streamUrl = stream.url || ''
+      
+      // Check if this is an RD+ stream (has resolve URL from Torrentio)
+      const isRdStream = stream.name?.includes('[RD') || streamUrl.includes('/resolve/')
+      
+      // For non-RD streams, build magnet URL from infoHash
       if (!streamUrl && stream.infoHash) {
         streamUrl = `magnet:?xt=urn:btih:${stream.infoHash}`
         if (stream.behaviorHints?.filename) {
@@ -263,14 +274,15 @@ async function fetchTorrentio(
 
       return {
         id: `torrentio-${idx}`,
-        name: stream.name || 'Unknown',
+        name: stream.name?.replace('[RD+] ', '').replace('[RD download] ', '') || 'Unknown',
         title: stream.title || '',
         quality: parseQuality(stream.title || stream.name || ''),
-        type: 'torrent' as const,
+        type: isRdStream ? 'debrid' as const : 'torrent' as const,
         url: streamUrl,
         provider: 'Torrentio',
         seeds: extractSeeds(stream.title || ''),
-        size: extractSize(stream.title || '')
+        size: extractSize(stream.title || ''),
+        cached: isRdStream  // RD+ streams are pre-cached
       }
     }).filter(s => s.url) // Only return sources with valid URLs
   } catch (err) {

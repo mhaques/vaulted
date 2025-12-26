@@ -177,8 +177,25 @@ export default function Title() {
     try {
       let streamUrl = source.url
       
-      if (source.url.startsWith('magnet:')) {
-        // For torrents, need debrid to get direct link
+      // Handle Torrentio Real-Debrid resolve URLs (type='debrid', cached streams)
+      // These URLs are like: https://torrentio.strem.fun/resolve/realdebrid/{key}/{hash}/...
+      if (source.type === 'debrid' && source.url.includes('/resolve/')) {
+        console.log('[RD] Resolving Torrentio cached stream...')
+        try {
+          // Fetch the resolve URL - Torrentio will return the final RD download URL
+          const resolveRes = await fetch(source.url, { redirect: 'follow' })
+          if (!resolveRes.ok) {
+            throw new Error(`Resolve failed: ${resolveRes.status}`)
+          }
+          // The final URL after redirects is the RD download link
+          streamUrl = resolveRes.url
+          console.log('[RD] Resolved to:', streamUrl.substring(0, 60) + '...')
+        } catch (resolveErr) {
+          console.error('[RD] Resolve error:', resolveErr)
+          throw new Error('Failed to resolve cached stream')
+        }
+      } else if (source.url.startsWith('magnet:')) {
+        // For magnet links (non-cached), need debrid to get direct link
         if (sourceAggregator.getDebridKey()) {
           const directLink = await addToDebrid(source.url)
           if (directLink) {
