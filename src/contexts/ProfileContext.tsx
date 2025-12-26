@@ -60,7 +60,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           const currentId = localStorage.getItem(CURRENT_PROFILE_KEY)
           const authToken = localStorage.getItem(PROFILE_AUTH_KEY)
           if (currentId && authToken) {
-            const profile = data.find((p: Profile) => p.id === currentId)
+            // Compare as strings since localStorage stores strings but DB returns numbers
+            const profile = data.find((p: Profile) => String(p.id) === String(currentId))
             if (profile) {
               console.log('Restored profile from localStorage:', profile.name)
               setCurrentProfile(profile)

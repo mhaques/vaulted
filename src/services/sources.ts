@@ -488,6 +488,37 @@ async function deleteTorrent(apiKey: string, torrentId: string): Promise<void> {
   }
 }
 
+// Helper to wait for torrent links to be available (handles queued/downloading status)
+async function waitForTorrentLinks(apiKey: string, torrentId: string, maxAttempts = 30): Promise<any> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const res = await fetch(`${RD_API}/torrents/info/${torrentId}?apiKey=${apiKey}`)
+    
+    if (res.status === 400) {
+      await deleteTorrent(apiKey, torrentId)
+      throw new Error('Torrent not available')
+    }
+    
+    if (!res.ok) throw new Error('Failed to get torrent info')
+    
+    const info = await res.json()
+    
+    if (info.status === 'downloaded' && info.links && info.links.length > 0) {
+      return info
+    } else if (info.status === 'magnet_error' || info.status === 'error' || info.status === 'virus' || info.status === 'dead') {
+      await deleteTorrent(apiKey, torrentId)
+      throw new Error(`Torrent error: ${info.status}`)
+    }
+    
+    // queued, downloading, uploading, compressing, etc - wait and retry
+    console.log(`[RD] Torrent status: ${info.status}, waiting... (${i + 1}/${maxAttempts})`)
+    await new Promise(r => setTimeout(r, 2000))
+  }
+  
+  // Timeout - torrent not ready in time
+  console.error('[RD] Torrent download timeout')
+  throw new Error('Torrent download timeout')
+}
+
 // Helper to wait for torrent to be ready
 async function waitForTorrentReady(apiKey: string, torrentId: string, maxAttempts = 10): Promise<any> {
   for (let i = 0; i < maxAttempts; i++) {
@@ -597,19 +628,9 @@ export async function addToDebrid(magnetLink: string): Promise<string | null> {
       await new Promise(r => setTimeout(r, 1000))
     }
 
-    // Step 4: Get updated info with links
+    // Step 4: Wait for torrent to download (if queued/downloading) and get links
     console.log('[RD] Getting download links...')
-    const finalRes = await fetch(`${RD_API}/torrents/info/${torrentId}?apiKey=${apiKey}`)
-    
-    if (finalRes.status === 400) {
-      // Torrent disappeared or not cached
-      await deleteTorrent(apiKey, torrentId)
-      throw new Error('Torrent not available')
-    }
-    
-    if (!finalRes.ok) throw new Error('Failed to get final torrent info')
-    
-    const finalInfo = await finalRes.json()
+    const finalInfo = await waitForTorrentLinks(apiKey, torrentId)
     console.log('[RD] Torrent status:', finalInfo.status, 'Links:', finalInfo.links?.length || 0)
     
     // Step 5: Unrestrict the link
