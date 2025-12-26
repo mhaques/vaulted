@@ -428,31 +428,42 @@ export default async function proxyRoutes(server: FastifyInstance) {
 
       console.log('[Torrentio Proxy] Fetching:', url.replace(/realdebrid=[^|/]+/, 'realdebrid=***'))
 
-      let response = await fetch(url, {
-        headers: {
-          'User-Agent': request.headers['user-agent'] || 'Mozilla/5.0 (Stremio Proxy)',
-          'Accept': 'application/json',
-          'Accept-Language': (request.headers['accept-language'] as string) || 'en-US,en;q=0.9',
-          'Referer': 'https://strem.io/',
-          'Origin': 'https://strem.io',
-          'X-Real-IP': clientIp,
-          'X-Forwarded-For': clientIp,
-        }
-      })
+      const userAgent = request.headers['user-agent'] || 'Mozilla/5.0 (Stremio Proxy)'
+      const acceptLanguage = (request.headers['accept-language'] as string) || 'en-US,en;q=0.9'
 
-      // Fallback: if Cloudflare blocks our server IP (403), retry through a public CORS proxy with a different egress IP
-      if (response.status === 403) {
-        const fallbackUrl = `https://cors.isomorphic-git.org/${encodeURIComponent(`${base}${path}`)}`
-        console.warn('[Torrentio Proxy] 403 from primary, retrying via fallback proxy')
-        response = await fetch(fallbackUrl, {
+      const targets = [
+        { url, label: 'primary', headers: { 'X-Real-IP': clientIp, 'X-Forwarded-For': clientIp } },
+        { url: `https://cors.isomorphic-git.org/${encodeURIComponent(url)}`, label: 'isomorphic-git' },
+        { url: `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(url)}`, label: 'thingproxy' },
+        { url: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, label: 'allorigins' },
+      ]
+
+      let response: Response | null = null
+      let lastStatus = 0
+
+      for (const target of targets) {
+        console.log(`[Torrentio Proxy] Trying ${target.label}:`, target.url.replace(/realdebrid=[^|/]+/, 'realdebrid=***'))
+        response = await fetch(target.url, {
           headers: {
-            'User-Agent': request.headers['user-agent'] || 'Mozilla/5.0 (Stremio Proxy)',
+            'User-Agent': userAgent,
             'Accept': 'application/json',
-            'Accept-Language': (request.headers['accept-language'] as string) || 'en-US,en;q=0.9',
+            'Accept-Language': acceptLanguage,
             'Referer': 'https://strem.io/',
             'Origin': 'https://strem.io',
+            ...(target.headers || {}),
           }
         })
+
+        lastStatus = response.status
+        if (response.ok) break
+
+        console.warn(`[Torrentio Proxy] ${target.label} returned ${response.status}, trying next`)        
+      }
+
+      if (!response || !response.ok) {
+        const text = response ? await response.text() : 'no response'
+        console.error('[Torrentio Proxy] Error:', lastStatus || 'unknown', text)
+        return reply.status(lastStatus || 502).send({ error: `Torrentio error: ${lastStatus || 502}`, details: text })
       }
 
       if (!response.ok) {
