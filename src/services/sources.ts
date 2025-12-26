@@ -251,7 +251,8 @@ async function fetchTorrentio(
     
     const streams: TorrentioStream[] = data.streams || []
 
-    return streams.map((stream, idx) => {
+    // Map to our source shape
+    const mapped = streams.map((stream, idx) => {
       // Build magnet URL from infoHash if url not provided
       let streamUrl = stream.url || ''
       if (!streamUrl && stream.infoHash) {
@@ -273,6 +274,28 @@ async function fetchTorrentio(
         size: extractSize(stream.title || '')
       }
     }).filter(s => s.url) // Only return sources with valid URLs
+
+    // If user has RD key, drop uncached magnets to avoid 503s
+    const rdKey = sourceAggregator.getDebridKey()
+    if (rdKey) {
+      const magnetLinks = mapped
+        .map(s => s.url)
+        .filter(u => u.startsWith('magnet:'))
+
+      if (magnetLinks.length > 0) {
+        const cache = await checkDebridCache(magnetLinks)
+        return mapped
+          .filter(s => {
+            if (!s.url.startsWith('magnet:')) return true
+            const match = s.url.match(/btih:([a-fA-F0-9]{40}|[a-zA-Z2-7]{32})/i)
+            if (!match) return false
+            return cache[match[1].toLowerCase()] === true
+          })
+          .map(s => ({ ...s, cached: true }))
+      }
+    }
+
+    return mapped
   } catch (err) {
     console.error('[Torrentio] Error:', err)
     return []
