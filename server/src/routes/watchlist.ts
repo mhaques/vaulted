@@ -9,24 +9,24 @@ interface WatchlistItem {
 }
 
 export default async function watchlistRoutes(server: FastifyInstance) {
-  // All routes require authentication
-  server.addHook('preHandler', (server as any).authenticate)
-
-  // Get user's watchlist
-  server.get('/', async (request) => {
-    const { id: userId } = request.user as { id: number }
+  // Get profile's watchlist
+  server.get<{ Params: { profileId: string } }>('/profiles/:profileId/watchlist', async (request) => {
+    const profileId = parseInt(request.params.profileId)
     const stmt = db.prepare(`
       SELECT media_type, media_id, title, poster_path, added_at
-      FROM watchlist
-      WHERE user_id = ?
+      FROM profile_watchlist
+      WHERE profile_id = ?
       ORDER BY added_at DESC
     `)
-    return stmt.all(userId)
+    return stmt.all(profileId)
   })
 
   // Add to watchlist
-  server.post<{ Body: WatchlistItem }>('/', async (request, reply) => {
-    const { id: userId } = request.user as { id: number }
+  server.post<{ 
+    Params: { profileId: string }
+    Body: WatchlistItem 
+  }>('/profiles/:profileId/watchlist', async (request, reply) => {
+    const profileId = parseInt(request.params.profileId)
     const { media_type, media_id, title, poster_path } = request.body
 
     if (!media_type || !media_id || !title) {
@@ -35,10 +35,10 @@ export default async function watchlistRoutes(server: FastifyInstance) {
 
     try {
       const stmt = db.prepare(`
-        INSERT INTO watchlist (user_id, media_type, media_id, title, poster_path)
+        INSERT INTO profile_watchlist (profile_id, media_type, media_id, title, poster_path)
         VALUES (?, ?, ?, ?, ?)
       `)
-      stmt.run(userId, media_type, media_id, title, poster_path || null)
+      stmt.run(profileId, media_type, media_id, title, poster_path || null)
       return { success: true }
     } catch (err: any) {
       if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {

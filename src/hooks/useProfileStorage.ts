@@ -30,8 +30,6 @@ export function useProfileStorage() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([])
   const [progress, setProgress] = useState<ProgressItem[]>([])
 
-  const getToken = () => localStorage.getItem('vaulted_token')
-
   // Load watchlist from API
   useEffect(() => {
     async function loadWatchlist() {
@@ -41,10 +39,7 @@ export function useProfileStorage() {
       }
 
       try {
-        const token = getToken()
-        const res = await fetch(`${API_URL}/api/profiles/${currentProfile.id}/watchlist`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        const res = await fetch(`${API_URL}/api/profiles/${currentProfile.id}/watchlist`)
         if (res.ok) {
           const data = await res.json()
           setWatchlist(data)
@@ -66,10 +61,7 @@ export function useProfileStorage() {
       }
 
       try {
-        const token = getToken()
-        const res = await fetch(`${API_URL}/api/profiles/${currentProfile.id}/progress`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        const res = await fetch(`${API_URL}/api/profiles/${currentProfile.id}/progress`)
         if (res.ok) {
           const data = await res.json()
           setProgress(data)
@@ -90,21 +82,17 @@ export function useProfileStorage() {
     if (!currentProfile) return
 
     try {
-      const token = getToken()
       const res = await fetch(`${API_URL}/api/profiles/${currentProfile.id}/watchlist`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(item)
       })
 
       if (res.ok) {
         // Reload watchlist
-        const newList = await fetch(`${API_URL}/api/profiles/${currentProfile.id}/watchlist`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }).then(r => r.json())
+        const newList = await fetch(`${API_URL}/api/profiles/${currentProfile.id}/watchlist`).then(r => r.json())
         setWatchlist(newList)
       }
     } catch (err) {
@@ -116,10 +104,8 @@ export function useProfileStorage() {
     if (!currentProfile) return
 
     try {
-      const token = getToken()
       await fetch(`${API_URL}/api/profiles/${currentProfile.id}/watchlist/${mediaType}/${mediaId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+        method: 'DELETE'
       })
 
       // Update local state
@@ -141,12 +127,10 @@ export function useProfileStorage() {
     if (!currentProfile) return
 
     try {
-      const token = getToken()
       await fetch(`${API_URL}/api/profiles/${currentProfile.id}/progress`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(item)
       })
