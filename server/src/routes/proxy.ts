@@ -434,8 +434,9 @@ export default async function proxyRoutes(server: FastifyInstance) {
       const targets = [
         { url, label: 'primary', headers: { 'X-Real-IP': clientIp, 'X-Forwarded-For': clientIp } },
         { url: `https://cors.isomorphic-git.org/${encodeURIComponent(url)}`, label: 'isomorphic-git' },
-        { url: `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(url)}`, label: 'thingproxy' },
+        { url: `https://corsproxy.io/?${encodeURIComponent(url)}`, label: 'corsproxy.io' },
         { url: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, label: 'allorigins' },
+        { url: `https://r.jina.ai/https://torrentio.strem.fun/${path}`, label: 'jina-ai' },
       ]
 
       let response: Response | null = null
