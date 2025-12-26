@@ -1,26 +1,19 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { Link } from 'react-router-dom'
 import { useProfile } from '../contexts/ProfileContext'
-import { useProfileStorage, WatchlistItem } from '../hooks/useProfileStorage'
+import { useProfileStorage } from '../hooks/useProfileStorage'
 import { IMG } from '../services/tmdb'
 import { IconX, IconFilm } from '../components/Icons'
 
 export default function Watchlist() {
   const { currentProfile } = useProfile()
-  const { getWatchlist, removeFromWatchlist } = useProfileStorage()
-  const [items, setItems] = useState<WatchlistItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const { watchlist, removeFromWatchlist } = useProfileStorage()
+  
+  // Sort by most recently added
+  const items = [...watchlist].sort((a, b) => b.added_at - a.added_at)
 
-  useEffect(() => {
-    if (currentProfile) {
-      setItems(getWatchlist())
-    }
-    setLoading(false)
-  }, [currentProfile])
-
-  const handleRemove = (mediaType: string, mediaId: number) => {
-    removeFromWatchlist(mediaType, mediaId)
-    setItems(items.filter(item => !(item.media_type === mediaType && item.media_id === mediaId)))
+  const handleRemove = async (mediaType: string, mediaId: number) => {
+    await removeFromWatchlist(mediaType, mediaId)
   }
 
   if (!currentProfile) {
@@ -39,17 +32,7 @@ export default function Watchlist() {
       <h1 className="text-2xl md:text-3xl font-semibold mb-1 tracking-tight text-white">Watchlist</h1>
       <p className="text-neutral-500 text-sm mb-6 md:mb-8">{items.length} items saved</p>
 
-      {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="animate-pulse">
-              <div className="glass rounded aspect-[2/3] mb-2" />
-              <div className="bg-neutral-800 rounded h-3 w-3/4 mb-1" />
-              <div className="bg-neutral-800 rounded h-2 w-1/2" />
-            </div>
-          ))}
-        </div>
-      ) : items.length > 0 ? (
+      {items.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {items.map((item) => (
             <div key={`${item.media_type}-${item.media_id}`} className="group cursor-pointer relative">

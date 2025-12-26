@@ -1,5 +1,5 @@
 import { useProfile } from '../contexts/ProfileContext'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3456'
 
@@ -30,8 +30,6 @@ export function useProfileStorage() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([])
   const [progress, setProgress] = useState<ProgressItem[]>([])
 
-  const getToken = () => localStorage.getItem('vaulted_token')
-
   // Load watchlist from API
   useEffect(() => {
     async function loadWatchlist() {
@@ -41,21 +39,29 @@ export function useProfileStorage() {
       }
 
       try {
-        const token = getToken()
-        const res = await fetch(`${API_URL}/api/profiles/${currentProfile.id}/watchlist`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        console.log('[useProfileStorage] Loading watchlist for profile:', currentProfile.id)
+        const res = await fetch(`${API_URL}/api/profiles/${currentProfile.id}/watchlist`)
         if (res.ok) {
           const data = await res.json()
-          setWatchlist(data)
+          console.log('[useProfileStorage] Loaded watchlist:', data.length, 'items')
+          // Map API response to our format
+          setWatchlist(data.map((item: any) => ({
+            media_type: item.mediaType || item.media_type,
+            media_id: item.mediaId || item.media_id,
+            title: item.title,
+            poster_path: item.posterPath || item.poster_path,
+            added_at: new Date(item.addedAt || item.added_at).getTime()
+          })))
+        } else {
+          console.error('[useProfileStorage] Failed to load watchlist:', res.status)
         }
       } catch (err) {
-        console.error('Failed to load watchlist:', err)
+        console.error('[useProfileStorage] Failed to load watchlist:', err)
       }
     }
 
     loadWatchlist()
-  }, [currentProfile])
+  }, [currentProfile?.id])
 
   // Load progress from API
   useEffect(() => {
@@ -66,129 +72,182 @@ export function useProfileStorage() {
       }
 
       try {
-        const token = getToken()
-        const res = await fetch(`${API_URL}/api/profiles/${currentProfile.id}/progress`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        console.log('[useProfileStorage] Loading progress for profile:', currentProfile.id)
+        const res = await fetch(`${API_URL}/api/profiles/${currentProfile.id}/progress`)
         if (res.ok) {
           const data = await res.json()
-          setProgress(data)
+          console.log('[useProfileStorage] Loaded progress:', data.length, 'items')
+          // Map API response to our format
+          setProgress(data.map((item: any) => ({
+            media_type: item.mediaType || item.media_type,
+            media_id: item.mediaId || item.media_id,
+            title: item.title,
+            poster_path: item.posterPath || item.poster_path,
+            current_time: item.currentTime || item.current_time,
+            duration: item.duration,
+            season: item.season,
+            episode: item.episode,
+            updated_at: new Date(item.updatedAt || item.updated_at).getTime()
+          })))
+        } else {
+          console.error('[useProfileStorage] Failed to load progress:', res.status)
         }
       } catch (err) {
-        console.error('Failed to load progress:', err)
+        console.error('[useProfileStorage] Failed to load progress:', err)
       }
     }
 
     loadProgress()
-  }, [currentProfile])
+  }, [currentProfile?.id])
 
-  const getWatchlist = (): WatchlistItem[] => {
+  const getWatchlist = useCallback((): WatchlistItem[] => {
     return watchlist
-  }
+  }, [watchlist])
 
-  const addToWatchlist = async (item: Omit<WatchlistItem, 'added_at'>) => {
-    if (!currentProfile) return
+  const addToWatchlist = useCallback(async (item: Omit<WatchlistItem, 'added_at'>) => {
+    if (!currentProfile) {
+      console.error('[useProfileStorage] No profile selected for addToWatchlist')
+      return
+    }
+
+    console.log('[useProfileStorage] Adding to watchlist:', item)
 
     try {
-      const token = getToken()
       const res = await fetch(`${API_URL}/api/profiles/${currentProfile.id}/watchlist`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify(item)
+        body: JSON.stringify({
+          media_type: item.media_type,
+          media_id: item.media_id,
+          title: item.title,
+          poster_path: item.poster_path
+        })
       })
 
       if (res.ok) {
-        // Reload watchlist
-        const newList = await fetch(`${API_URL}/api/profiles/${currentProfile.id}/watchlist`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }).then(r => r.json())
-        setWatchlist(newList)
+        console.log('[useProfileStorage] Added to watchlist successfully')
+        // Add to local state immediately
+        setWatchlist(prev => [{ ...item, added_at: Date.now() }, ...prev])
+      } else {
+        const error = await res.json()
+        console.error('[useProfileStorage] Failed to add to watchlist:', error)
       }
     } catch (err) {
-      console.error('Failed to add to watchlist:', err)
+      console.error('[useProfileStorage] Failed to add to watchlist:', err)
     }
-  }
+  }, [currentProfile?.id])
 
-  const removeFromWatchlist = async (mediaType: string, mediaId: number) => {
+  const removeFromWatchlist = useCallback(async (mediaType: string, mediaId: number) => {
     if (!currentProfile) return
 
+    console.log('[useProfileStorage] Removing from watchlist:', mediaType, mediaId)
+
     try {
-      const token = getToken()
       await fetch(`${API_URL}/api/profiles/${currentProfile.id}/watchlist/${mediaType}/${mediaId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+        method: 'DELETE'
       })
 
       // Update local state
-      setWatchlist(watchlist.filter(i => !(i.media_type === mediaType && i.media_id === mediaId)))
+      setWatchlist(prev => prev.filter(i => !(i.media_type === mediaType && i.media_id === mediaId)))
     } catch (err) {
-      console.error('Failed to remove from watchlist:', err)
+      console.error('[useProfileStorage] Failed to remove from watchlist:', err)
     }
-  }
+  }, [currentProfile?.id])
 
-  const isInWatchlist = (mediaType: string, mediaId: number): boolean => {
+  const isInWatchlist = useCallback((mediaType: string, mediaId: number): boolean => {
     return watchlist.some(i => i.media_type === mediaType && i.media_id === mediaId)
-  }
+  }, [watchlist])
 
-  const getProgress = (): ProgressItem[] => {
+  const getProgress = useCallback((): ProgressItem[] => {
     return progress
-  }
+  }, [progress])
 
-  const saveProgress = async (item: Omit<ProgressItem, 'updated_at'>) => {
-    if (!currentProfile) return
+  const saveProgress = useCallback(async (item: Omit<ProgressItem, 'updated_at'>) => {
+    if (!currentProfile) {
+      console.error('[useProfileStorage] No profile selected for saveProgress')
+      return
+    }
+
+    // Don't save very short progress (less than 30 seconds)
+    if (item.current_time < 30) {
+      return
+    }
+
+    console.log('[useProfileStorage] Saving progress:', item)
 
     try {
-      const token = getToken()
-      await fetch(`${API_URL}/api/profiles/${currentProfile.id}/progress`, {
+      const res = await fetch(`${API_URL}/api/profiles/${currentProfile.id}/progress`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify(item)
+        body: JSON.stringify({
+          media_type: item.media_type,
+          media_id: item.media_id,
+          title: item.title,
+          poster_path: item.poster_path,
+          current_time: Math.floor(item.current_time),
+          duration: Math.floor(item.duration),
+          season: item.season || null,
+          episode: item.episode || null
+        })
       })
 
-      // Update local state
-      const filtered = progress.filter(i => {
-        if (i.media_type !== item.media_type || i.media_id !== item.media_id) return true
-        if (item.season !== undefined && item.episode !== undefined) {
-          return !(i.season === item.season && i.episode === item.episode)
-        }
-        return false
-      })
-      setProgress([{ ...item, updated_at: Date.now() }, ...filtered])
+      if (res.ok) {
+        console.log('[useProfileStorage] Progress saved successfully')
+        // Update local state
+        setProgress(prev => {
+          const filtered = prev.filter(i => {
+            if (i.media_type !== item.media_type || i.media_id !== item.media_id) return true
+            if (item.season !== undefined && item.episode !== undefined) {
+              return !(i.season === item.season && i.episode === item.episode)
+            }
+            return false
+          })
+          return [{ ...item, updated_at: Date.now() }, ...filtered]
+        })
+      } else {
+        console.error('[useProfileStorage] Failed to save progress:', res.status)
+      }
     } catch (err) {
-      console.error('Failed to save progress:', err)
+      console.error('[useProfileStorage] Failed to save progress:', err)
     }
-  }
+  }, [currentProfile?.id])
 
-  const getItemProgress = (mediaType: string, mediaId: number, season?: number, episode?: number): ProgressItem | undefined => {
+  const getItemProgress = useCallback((mediaType: string, mediaId: number, season?: number, episode?: number): ProgressItem | undefined => {
     return progress.find(i => {
       if (i.media_type !== mediaType || i.media_id !== mediaId) return false
       if (season !== undefined && episode !== undefined) {
         return i.season === season && i.episode === episode
       }
-      return true
+      return i.season === undefined || i.season === null
     })
-  }
+  }, [progress])
 
-  const removeProgress = async (mediaType: string, mediaId: number, season?: number, episode?: number) => {
+  const removeProgress = useCallback(async (mediaType: string, mediaId: number, season?: number, episode?: number) => {
     if (!currentProfile) return
 
-    // For now, just update local state
-    // Could add a DELETE endpoint if needed
-    const updated = progress.filter(i => {
-      if (i.media_type !== mediaType || i.media_id !== mediaId) return true
+    try {
+      let url = `${API_URL}/api/profiles/${currentProfile.id}/progress/${mediaType}/${mediaId}`
       if (season !== undefined && episode !== undefined) {
-        return !(i.season === season && i.episode === episode)
+        url += `?season=${season}&episode=${episode}`
       }
-      return false
-    })
-    setProgress(updated)
-  }
+      await fetch(url, { method: 'DELETE' })
+
+      // Update local state
+      setProgress(prev => prev.filter(i => {
+        if (i.media_type !== mediaType || i.media_id !== mediaId) return true
+        if (season !== undefined && episode !== undefined) {
+          return !(i.season === season && i.episode === episode)
+        }
+        return false
+      }))
+    } catch (err) {
+      console.error('[useProfileStorage] Failed to remove progress:', err)
+    }
+  }, [currentProfile?.id])
 
   return {
     // Watchlist
@@ -196,11 +255,13 @@ export function useProfileStorage() {
     addToWatchlist,
     removeFromWatchlist,
     isInWatchlist,
+    watchlist, // Direct access to watchlist state
     // Progress
     getProgress,
     saveProgress,
     getItemProgress,
-    removeProgress
+    removeProgress,
+    progress // Direct access to progress state
   }
 }
 

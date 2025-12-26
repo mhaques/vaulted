@@ -179,25 +179,248 @@ export default async function profileRoutes(fastify: FastifyInstance) {
     return profile
   })
 
-  // Get watchlist for a profile
+  // ==================== WATCHLIST ROUTES ====================
+  
+  // Get watchlist for a profile (NO AUTH - profile-based system)
   fastify.get<{
     Params: { id: string }
   }>('/profiles/:id/watchlist', async (request, reply) => {
-    const userId = (request.user as any)?.id
-    if (!userId) {
-      return reply.code(401).send({ error: 'Unauthorized' })
-    }
-
     const profileId = parseInt(request.params.id)
 
-    // Verify profile belongs to user
-    const profile = db.prepare('SELECT id FROM profiles WHERE id = ? AND user_id = ?').get(profileId, userId)
+    // Verify profile exists
+    const profile = db.prepare('SELECT id FROM profiles WHERE id = ?').get(profileId)
     if (!profile) {
       return reply.code(404).send({ error: 'Profile not found' })
     }
 
     const watchlist = db.prepare(`
       SELECT id, media_type as mediaType, media_id as mediaId, title, poster_path as posterPath, added_at as addedAt
+      FROM profile_watchlist
+      WHERE profile_id = ?
+      ORDER BY added_at DESC
+    `).all(profileId)
+
+    console.log(`[Watchlist] GET profile ${profileId}: ${watchlist.length} items`)
+    return watchlist
+  })
+
+  // Add to watchlist (NO AUTH - profile-based system)
+  fastify.post<{
+    Params: { id: string }
+    Body: { media_type: string; media_id: number; title: string; poster_path?: string }
+  }>('/profiles/:id/watchlist', async (request, reply) => {
+    const profileId = parseInt(request.params.id)
+    const { media_type, media_id, title, poster_path } = request.body
+
+    console.log(`[Watchlist] POST profile ${profileId}:`, { media_type, media_id, title })
+
+    // Verify profile exists
+    const profile = db.prepare('SELECT id FROM profiles WHERE id = ?').get(profileId)
+    if (!profile) {
+      return reply.code(404).send({ error: 'Profile not found' })
+    }
+
+    if (!media_type || !media_id || !title) {
+      return reply.code(400).send({ error: 'Missing required fields: media_type, media_id, title' })
+    }
+
+    try {
+      db.prepare(`
+        INSERT INTO profile_watchlist (profile_id, media_type, media_id, title, poster_path)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(profileId, media_type, media_id, title, poster_path || null)
+
+      console.log(`[Watchlist] Added to profile ${profileId}: ${title}`)
+      return { success: true }
+    } catch (err: any) {
+      if (err.message.includes('UNIQUE constraint')) {
+        console.log(`[Watchlist] Already exists in profile ${profileId}: ${title}`)
+        return reply.code(409).send({ error: 'Already in watchlist' })
+      }
+      console.error('[Watchlist] Error:', err)
+      throw err
+    }
+  })
+
+  // Remove from watchlist (NO AUTH - profile-based system)
+  fastify.delete<{
+    Params: { id: string; mediaType: string; mediaId: string }
+  }>('/profiles/:id/watchlist/:mediaType/:mediaId', async (request, reply) => {
+    const profileId = parseInt(request.params.id)
+    const { mediaType, mediaId } = request.params
+
+    console.log(`[Watchlist] DELETE profile ${profileId}: ${mediaType}/${mediaId}`)
+
+    // Verify profile exists
+    const profile = db.prepare('SELECT id FROM profiles WHERE id = ?').get(profileId)
+    if (!profile) {
+      return reply.code(404).send({ error: 'Profile not found' })
+    }
+
+    const result = db.prepare(`
+      DELETE FROM profile_watchlist
+      WHERE profile_id = ? AND media_type = ? AND media_id = ?
+    `).run(profileId, mediaType, parseInt(mediaId))
+
+    console.log(`[Watchlist] Deleted ${result.changes} items from profile ${profileId}`)
+    return { success: true }
+  })
+
+  // Check if in watchlist (NO AUTH - profile-based system)
+  fastify.get<{
+    Params: { id: string; mediaType: string; mediaId: string }
+  }>('/profiles/:id/watchlist/:mediaType/:mediaId', async (request, reply) => {
+    const profileId = parseInt(request.params.id)
+    const { mediaType, mediaId } = request.params
+
+    const exists = db.prepare(`
+      SELECT 1 FROM profile_watchlist
+      WHERE profile_id = ? AND media_type = ? AND media_id = ?
+    `).get(profileId, mediaType, parseInt(mediaId))
+
+    return { inWatchlist: !!exists }
+  })
+
+  // ==================== PROGRESS ROUTES ====================
+
+  // Get all progress for a profile (continue watching)
+  fastify.get<{
+    Params: { id: string }
+  }>('/profiles/:id/progress', async (request, reply) => {
+    const profileId = parseInt(request.params.id)
+
+    // Verify profile exists
+    const profile = db.prepare('SELECT id FROM profiles WHERE id = ?').get(profileId)
+    if (!profile) {
+      return reply.code(404).send({ error: 'Profile not found' })
+    }
+
+    const progress = db.prepare(`
+      SELECT id, media_type as mediaType, media_id as mediaId, title, poster_path as posterPath,
+             season, episode, current_time as currentTime, duration, updated_at as updatedAt
+      FROM profile_progress
+      WHERE profile_id = ? AND current_time < duration * 0.95 AND current_time > 30
+      ORDER BY updated_at DESC
+      LIMIT 20
+    `).all(profileId)
+
+    console.log(`[Progress] GET profile ${profileId}: ${progress.length} items`)
+    return progress
+  })
+
+  // Save progress (NO AUTH - profile-based system)
+  fastify.post<{
+    Params: { id: string }
+    Body: {
+      media_type: string
+      media_id: number
+      title: string
+      poster_path?: string
+      current_time: number
+      duration: number
+      season?: number
+      episode?: number
+    }
+  }>('/profiles/:id/progress', async (request, reply) => {
+    const profileId = parseInt(request.params.id)
+    const { media_type, media_id, title, poster_path, current_time, duration, season, episode } = request.body
+
+    console.log(`[Progress] POST profile ${profileId}:`, { media_type, media_id, title, current_time, duration, season, episode })
+
+    // Verify profile exists
+    const profile = db.prepare('SELECT id FROM profiles WHERE id = ?').get(profileId)
+    if (!profile) {
+      return reply.code(404).send({ error: 'Profile not found' })
+    }
+
+    if (!media_type || !media_id || !title || current_time === undefined || duration === undefined) {
+      return reply.code(400).send({ error: 'Missing required fields' })
+    }
+
+    try {
+      db.prepare(`
+        INSERT INTO profile_progress (profile_id, media_type, media_id, title, poster_path, current_time, duration, season, episode, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(profile_id, media_type, media_id, season, episode)
+        DO UPDATE SET
+          title = excluded.title,
+          poster_path = excluded.poster_path,
+          current_time = excluded.current_time,
+          duration = excluded.duration,
+          updated_at = datetime('now')
+      `).run(profileId, media_type, media_id, title, poster_path || null, current_time, duration, season || null, episode || null)
+
+      console.log(`[Progress] Saved for profile ${profileId}: ${title} at ${current_time}s / ${duration}s`)
+      return { success: true }
+    } catch (err) {
+      console.error('[Progress] Error:', err)
+      return reply.code(500).send({ error: 'Failed to save progress' })
+    }
+  })
+
+  // Get specific progress
+  fastify.get<{
+    Params: { id: string; mediaType: string; mediaId: string }
+    Querystring: { season?: string; episode?: string }
+  }>('/profiles/:id/progress/:mediaType/:mediaId', async (request, reply) => {
+    const profileId = parseInt(request.params.id)
+    const { mediaType, mediaId } = request.params
+    const { season, episode } = request.query
+
+    // Verify profile exists
+    const profile = db.prepare('SELECT id FROM profiles WHERE id = ?').get(profileId)
+    if (!profile) {
+      return reply.code(404).send({ error: 'Profile not found' })
+    }
+
+    let progress
+    if (season && episode) {
+      progress = db.prepare(`
+        SELECT current_time as currentTime, duration
+        FROM profile_progress
+        WHERE profile_id = ? AND media_type = ? AND media_id = ? AND season = ? AND episode = ?
+      `).get(profileId, mediaType, parseInt(mediaId), parseInt(season), parseInt(episode))
+    } else {
+      progress = db.prepare(`
+        SELECT current_time as currentTime, duration
+        FROM profile_progress
+        WHERE profile_id = ? AND media_type = ? AND media_id = ? AND season IS NULL AND episode IS NULL
+      `).get(profileId, mediaType, parseInt(mediaId))
+    }
+
+    return progress || { currentTime: 0, duration: 0 }
+  })
+
+  // Delete progress
+  fastify.delete<{
+    Params: { id: string; mediaType: string; mediaId: string }
+    Querystring: { season?: string; episode?: string }
+  }>('/profiles/:id/progress/:mediaType/:mediaId', async (request, reply) => {
+    const profileId = parseInt(request.params.id)
+    const { mediaType, mediaId } = request.params
+    const { season, episode } = request.query
+
+    // Verify profile exists
+    const profile = db.prepare('SELECT id FROM profiles WHERE id = ?').get(profileId)
+    if (!profile) {
+      return reply.code(404).send({ error: 'Profile not found' })
+    }
+
+    if (season && episode) {
+      db.prepare(`
+        DELETE FROM profile_progress
+        WHERE profile_id = ? AND media_type = ? AND media_id = ? AND season = ? AND episode = ?
+      `).run(profileId, mediaType, parseInt(mediaId), parseInt(season), parseInt(episode))
+    } else {
+      db.prepare(`
+        DELETE FROM profile_progress
+        WHERE profile_id = ? AND media_type = ? AND media_id = ?
+      `).run(profileId, mediaType, parseInt(mediaId))
+    }
+
+    return { success: true }
+  })
+}
       FROM profile_watchlist
       WHERE profile_id = ?
       ORDER BY added_at DESC

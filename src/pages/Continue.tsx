@@ -1,35 +1,19 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { Link } from 'react-router-dom'
 import { useProfile } from '../contexts/ProfileContext'
-import { useProfileStorage, ProgressItem } from '../hooks/useProfileStorage'
+import { useProfileStorage } from '../hooks/useProfileStorage'
 import { IMG } from '../services/tmdb'
 import { IconPlay, IconX } from '../components/Icons'
 
 export default function Continue() {
   const { currentProfile } = useProfile()
-  const { getProgress, removeProgress } = useProfileStorage()
-  const [items, setItems] = useState<ProgressItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const { progress, removeProgress } = useProfileStorage()
+  
+  // Sort by most recently updated
+  const items = [...progress].sort((a, b) => b.updated_at - a.updated_at)
 
-  useEffect(() => {
-    if (currentProfile) {
-      const progress = getProgress()
-      // Sort by most recently updated
-      const sorted = progress.sort((a, b) => b.updated_at - a.updated_at)
-      setItems(sorted)
-    }
-    setLoading(false)
-  }, [currentProfile])
-
-  const handleClear = (mediaType: string, mediaId: number, season?: number, episode?: number) => {
-    removeProgress(mediaType, mediaId, season, episode)
-    setItems(items.filter(item => {
-      if (item.media_type !== mediaType || item.media_id !== mediaId) return true
-      if (season !== undefined && episode !== undefined) {
-        return !(item.season === season && item.episode === episode)
-      }
-      return false
-    }))
+  const handleClear = async (mediaType: string, mediaId: number, season?: number, episode?: number) => {
+    await removeProgress(mediaType, mediaId, season, episode)
   }
 
   const formatTime = (seconds: number) => {
@@ -57,22 +41,7 @@ export default function Continue() {
       <h1 className="text-2xl md:text-3xl font-semibold mb-1 tracking-tight text-white">Continue Watching</h1>
       <p className="text-neutral-500 text-sm mb-6 md:mb-8">{items.length} in progress</p>
 
-      {loading ? (
-        <div className="space-y-4">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="animate-pulse glass rounded p-4">
-              <div className="flex gap-4">
-                <div className="w-32 h-24 bg-neutral-800 rounded" />
-                <div className="flex-1">
-                  <div className="bg-neutral-800 rounded h-5 w-48 mb-2" />
-                  <div className="bg-neutral-800 rounded h-3 w-24 mb-4" />
-                  <div className="bg-neutral-800 rounded h-2 w-full" />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : items.length > 0 ? (
+      {items.length > 0 ? (
         <div className="space-y-4">
           {items.map((item) => {
             const progressPercent = Math.round((item.current_time / item.duration) * 100)
