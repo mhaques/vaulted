@@ -202,8 +202,8 @@ export const sourceAggregator = new SourceAggregator()
 // PROVIDER: Torrentio (Stremio Addon)
 // ============================================
 
-// Always use direct Torrentio URL - it's a public API with CORS enabled
-const TORRENTIO_BASE = 'https://torrentio.strem.fun'
+// Use our server proxy for Torrentio to avoid CORS issues (especially with RD key)
+const TORRENTIO_BASE = `${import.meta.env.VITE_API_URL}/api/proxy/torrentio`
 
 // Torrentio base config: sort by quality, filter out low quality
 const TORRENTIO_CONFIG_BASE = 'sort=qualitysize|qualityfilter=480p,scr,cam'

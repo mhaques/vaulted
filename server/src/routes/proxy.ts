@@ -412,4 +412,30 @@ export default async function proxyRoutes(server: FastifyInstance) {
       return reply.status(500).send({ error: 'Real-Debrid proxy failed' })
     }
   })
+
+  // Proxy Torrentio API requests (needed when RD key is in URL - CORS blocked)
+  server.get<{
+    Params: { '*': string }
+  }>('/torrentio/*', async (request: FastifyRequest<{ Params: { '*': string } }>, reply: FastifyReply) => {
+    try {
+      // Get the full path after /torrentio/
+      const path = request.params['*'] || ''
+      const url = `https://torrentio.strem.fun/${path}`
+      
+      console.log('[Torrentio Proxy] Fetching:', url.replace(/realdebrid=[^|/]+/, 'realdebrid=***'))
+
+      const response = await fetch(url)
+      
+      if (!response.ok) {
+        console.error('[Torrentio Proxy] Error:', response.status, response.statusText)
+        return reply.status(response.status).send({ error: `Torrentio error: ${response.status}` })
+      }
+
+      const data = await response.json()
+      return reply.send(data)
+    } catch (err) {
+      console.error('[Torrentio Proxy] Error:', err)
+      return reply.status(500).send({ error: 'Torrentio proxy failed' })
+    }
+  })
 }
