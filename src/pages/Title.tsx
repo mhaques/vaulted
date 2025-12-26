@@ -150,8 +150,8 @@ export default function Title() {
         return
       }
       
-      // Auto-play the best source
-      await tryPlaySource(sorted[0], sorted)
+      // Auto-play the best source (will auto-retry on failure)
+      await tryPlaySource(sorted[0], sorted, 0)
     } catch (err) {
       console.error('Failed to fetch sources:', err)
       setPlayError('Failed to fetch sources')
@@ -170,7 +170,7 @@ export default function Title() {
   }
 
   // Try to play a source, fallback to next if it fails
-  const tryPlaySource = async (source: StreamSource, allSources: StreamSource[]) => {
+  const tryPlaySource = async (source: StreamSource, allSources: StreamSource[], attemptIndex: number = 0) => {
     setPlayingSource(source)
     setPlayError(null)
     
@@ -215,11 +215,25 @@ export default function Title() {
         setPlayerUrl(streamUrl)
         setIsPlaying(true)
       }
-    } catch (err) {
-      console.error('Source failed:', source.name, err)
+    } catch (err: any) {
+      console.error(`Source failed: ${source.name}`, err)
       
-      // Don't auto-retry - show source picker instead
-      setPlayError(`Failed to play: ${err instanceof Error ? err.message : 'Unknown error'}. Please select another source.`)
+      // Auto-try next source (up to 5 attempts)
+      const maxAutoRetries = 5
+      const nextIndex = attemptIndex + 1
+      const currentSourceIndex = allSources.findIndex(s => s.id === source.id)
+      const nextSource = allSources[currentSourceIndex + 1]
+      
+      if (nextSource && nextIndex <= maxAutoRetries) {
+        console.log(`Trying next source (${nextIndex}/${maxAutoRetries}): ${nextSource.name}`)
+        setPlayError(`${source.name} failed, trying ${nextSource.name}...`)
+        // Small delay before trying next
+        await new Promise(r => setTimeout(r, 500))
+        return tryPlaySource(nextSource, allSources, nextIndex)
+      }
+      
+      // No more auto-retries - show source picker
+      setPlayError(`Failed to play: ${err.message || 'Unknown error'}. Please select another source.`)
       setShowSourcePicker(true)
     }
   }
@@ -227,7 +241,7 @@ export default function Title() {
   // Play a specific source from the picker
   const playSource = async (source: StreamSource) => {
     setShowSourcePicker(false)
-    await tryPlaySource(source, sources)
+    await tryPlaySource(source, sources, 0)
   }
 
   // Handle progress saving
