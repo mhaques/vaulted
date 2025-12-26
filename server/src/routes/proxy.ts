@@ -418,20 +418,27 @@ export default async function proxyRoutes(server: FastifyInstance) {
     Params: { '*': string }
   }>('/torrentio/*', async (request: FastifyRequest<{ Params: { '*': string } }>, reply: FastifyReply) => {
     try {
-      // Get the full path after /torrentio/
-      const path = request.params['*'] || ''
+      // Preserve original encoding so the upstream sees the exact path (pipes, commas, etc.)
+      const rawPath = (request.raw.url || '').replace(/^\/api\/proxy\/torrentio\//, '')
+      const path = rawPath || request.params['*'] || ''
       const url = `https://torrentio.strem.fun/${path}`
-      
+
+      const clientIp = (request.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() || request.ip
+
       console.log('[Torrentio Proxy] Fetching:', url.replace(/realdebrid=[^|/]+/, 'realdebrid=***'))
 
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'Stremio/1.0.0',
+          'User-Agent': request.headers['user-agent'] || 'Mozilla/5.0 (Stremio Proxy)',
           'Accept': 'application/json',
-          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Language': (request.headers['accept-language'] as string) || 'en-US,en;q=0.9',
+          'Referer': 'https://strem.io/',
+          'Origin': 'https://strem.io',
+          'X-Real-IP': clientIp,
+          'X-Forwarded-For': clientIp,
         }
       })
-      
+
       if (!response.ok) {
         const text = await response.text()
         console.error('[Torrentio Proxy] Error:', response.status, response.statusText, text)
