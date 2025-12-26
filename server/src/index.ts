@@ -40,8 +40,8 @@ server.decorate('authenticate', async (request: any, reply: any) => {
 
 // Register routes
 await server.register(authRoutes, { prefix: '/api/auth' })
-await server.register(watchlistRoutes, { prefix: '/api' })
-await server.register(progressRoutes, { prefix: '/api' })
+await server.register(watchlistRoutes, { prefix: '/api/watchlist' })
+await server.register(progressRoutes, { prefix: '/api/progress' })
 await server.register(proxyRoutes, { prefix: '/api/proxy' })
 await server.register(profileRoutes, { prefix: '/api' })
 
