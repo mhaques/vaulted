@@ -272,16 +272,7 @@ async function fetchTorrentio(
         seeds: extractSeeds(stream.title || ''),
         size: extractSize(stream.title || '')
       }
-    }).filter(s => {
-      if (!s.url) return false
-      // Filter out disc image formats that can't be played
-      const title = (s.title + ' ' + s.name).toLowerCase()
-      if (title.includes('.iso') || title.includes('bdremux') || title.includes('disc') || title.includes('full bluray')) {
-        console.log('[Torrentio] Skipping non-playable format:', s.title?.substring(0, 50))
-        return false
-      }
-      return true
-    })
+    }).filter(s => s.url) // Only return sources with valid URLs
   } catch (err) {
     console.error('[Torrentio] Error:', err)
     return []
@@ -607,17 +598,16 @@ export async function addToDebrid(magnetLink: string): Promise<string | null> {
         playableExtensions.test(f.path) && f.selected === 0
       ) || []
       
-      if (videoFiles.length === 0) {
-        // No playable video files found - this is likely an .iso or disc image
-        console.error('[RD] No playable video files found in torrent - skipping')
-        await deleteTorrent(apiKey, torrentId)
-        return null
+      let fileIds = 'all'
+      if (videoFiles.length > 0) {
+        // Select the largest playable video file
+        const largest = videoFiles.reduce((a: any, b: any) => a.bytes > b.bytes ? a : b)
+        fileIds = String(largest.id)
+        console.log('[RD] Selected video file:', largest.path)
+      } else {
+        // No playable video files found - try 'all' as fallback
+        console.log('[RD] No playable video files in list, trying all files')
       }
-      
-      // Select the largest playable video file
-      const largest = videoFiles.reduce((a: any, b: any) => a.bytes > b.bytes ? a : b)
-      const fileIds = String(largest.id)
-      console.log('[RD] Selected video file:', largest.path)
       
       const selectRes = await fetch(`${RD_API}/torrents/selectFiles/${torrentId}`, {
         method: 'POST',
