@@ -477,15 +477,6 @@ export default async function proxyRoutes(server: FastifyInstance) {
       const data = await response.json()
       torrentioCache.set(path, { ts: Date.now(), data })
       return reply.send(data)
-
-      if (!response.ok) {
-        const text = await response.text()
-        console.error('[Torrentio Proxy] Error:', response.status, response.statusText, text)
-        return reply.status(response.status).send({ error: `Torrentio error: ${response.status}`, details: text })
-      }
-
-      const data = await response.json()
-      return reply.send(data)
     } catch (err) {
       console.error('[Torrentio Proxy] Error:', err)
       return reply.status(500).send({ error: 'Torrentio proxy failed' })
