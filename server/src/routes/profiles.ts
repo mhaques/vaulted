@@ -178,4 +178,160 @@ export default async function profileRoutes(fastify: FastifyInstance) {
 
     return profile
   })
+
+  // Get watchlist for a profile
+  fastify.get<{
+    Params: { id: string }
+  }>('/profiles/:id/watchlist', async (request, reply) => {
+    const userId = (request.user as any)?.id
+    if (!userId) {
+      return reply.code(401).send({ error: 'Unauthorized' })
+    }
+
+    const profileId = parseInt(request.params.id)
+
+    // Verify profile belongs to user
+    const profile = db.prepare('SELECT id FROM profiles WHERE id = ? AND user_id = ?').get(profileId, userId)
+    if (!profile) {
+      return reply.code(404).send({ error: 'Profile not found' })
+    }
+
+    const watchlist = db.prepare(`
+      SELECT id, media_type as mediaType, media_id as mediaId, title, poster_path as posterPath, added_at as addedAt
+      FROM profile_watchlist
+      WHERE profile_id = ?
+      ORDER BY added_at DESC
+    `).all(profileId)
+
+    return watchlist
+  })
+
+  // Add to watchlist
+  fastify.post<{
+    Params: { id: string }
+    Body: { media_type: string; media_id: number; title: string; poster_path?: string }
+  }>('/profiles/:id/watchlist', async (request, reply) => {
+    const userId = (request.user as any)?.id
+    if (!userId) {
+      return reply.code(401).send({ error: 'Unauthorized' })
+    }
+
+    const profileId = parseInt(request.params.id)
+    const { media_type, media_id, title, poster_path } = request.body
+
+    // Verify profile belongs to user
+    const profile = db.prepare('SELECT id FROM profiles WHERE id = ? AND user_id = ?').get(profileId, userId)
+    if (!profile) {
+      return reply.code(404).send({ error: 'Profile not found' })
+    }
+
+    try {
+      db.prepare(`
+        INSERT INTO profile_watchlist (profile_id, media_type, media_id, title, poster_path)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(profileId, media_type, media_id, title, poster_path || null)
+
+      return { success: true }
+    } catch (err: any) {
+      if (err.message.includes('UNIQUE constraint')) {
+        return reply.code(409).send({ error: 'Already in watchlist' })
+      }
+      throw err
+    }
+  })
+
+  // Remove from watchlist
+  fastify.delete<{
+    Params: { id: string; mediaType: string; mediaId: string }
+  }>('/profiles/:id/watchlist/:mediaType/:mediaId', async (request, reply) => {
+    const userId = (request.user as any)?.id
+    if (!userId) {
+      return reply.code(401).send({ error: 'Unauthorized' })
+    }
+
+    const profileId = parseInt(request.params.id)
+    const { mediaType, mediaId } = request.params
+
+    // Verify profile belongs to user
+    const profile = db.prepare('SELECT id FROM profiles WHERE id = ? AND user_id = ?').get(profileId, userId)
+    if (!profile) {
+      return reply.code(404).send({ error: 'Profile not found' })
+    }
+
+    db.prepare(`
+      DELETE FROM profile_watchlist
+      WHERE profile_id = ? AND media_type = ? AND media_id = ?
+    `).run(profileId, mediaType, parseInt(mediaId))
+
+    return { success: true }
+  })
+
+  // Get progress for a profile
+  fastify.get<{
+    Params: { id: string }
+  }>('/profiles/:id/progress', async (request, reply) => {
+    const userId = (request.user as any)?.id
+    if (!userId) {
+      return reply.code(401).send({ error: 'Unauthorized' })
+    }
+
+    const profileId = parseInt(request.params.id)
+
+    // Verify profile belongs to user
+    const profile = db.prepare('SELECT id FROM profiles WHERE id = ? AND user_id = ?').get(profileId, userId)
+    if (!profile) {
+      return reply.code(404).send({ error: 'Profile not found' })
+    }
+
+    const progress = db.prepare(`
+      SELECT id, media_type as mediaType, media_id as mediaId, title, poster_path as posterPath,
+             season, episode, current_time as currentTime, duration, updated_at as updatedAt
+      FROM profile_progress
+      WHERE profile_id = ?
+      ORDER BY updated_at DESC
+    `).all(profileId)
+
+    return progress
+  })
+
+  // Save progress
+  fastify.post<{
+    Params: { id: string }
+    Body: {
+      media_type: string
+      media_id: number
+      title: string
+      poster_path?: string
+      current_time: number
+      duration: number
+      season?: number
+      episode?: number
+    }
+  }>('/profiles/:id/progress', async (request, reply) => {
+    const userId = (request.user as any)?.id
+    if (!userId) {
+      return reply.code(401).send({ error: 'Unauthorized' })
+    }
+
+    const profileId = parseInt(request.params.id)
+    const { media_type, media_id, title, poster_path, current_time, duration, season, episode } = request.body
+
+    // Verify profile belongs to user
+    const profile = db.prepare('SELECT id FROM profiles WHERE id = ? AND user_id = ?').get(profileId, userId)
+    if (!profile) {
+      return reply.code(404).send({ error: 'Profile not found' })
+    }
+
+    db.prepare(`
+      INSERT INTO profile_progress (profile_id, media_type, media_id, title, poster_path, current_time, duration, season, episode, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(profile_id, media_type, media_id, season, episode)
+      DO UPDATE SET
+        current_time = excluded.current_time,
+        duration = excluded.duration,
+        updated_at = datetime('now')
+    `).run(profileId, media_type, media_id, title, poster_path || null, current_time, duration, season || null, episode || null)
+
+    return { success: true }
+  })
 }
