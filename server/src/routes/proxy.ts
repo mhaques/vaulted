@@ -414,6 +414,8 @@ export default async function proxyRoutes(server: FastifyInstance) {
   })
 
   // Proxy Torrentio API requests (needed when RD key is in URL - CORS blocked)
+    const torrentioCache = new Map<string, { ts: number; data: unknown }>()
+    const CACHE_TTL_MS = 5 * 60 * 1000
   server.get<{
     Params: { '*': string }
   }>('/torrentio/*', async (request: FastifyRequest<{ Params: { '*': string } }>, reply: FastifyReply) => {
@@ -424,6 +426,12 @@ export default async function proxyRoutes(server: FastifyInstance) {
       const base = 'https://torrentio.strem.fun/'
       const url = `${base}${path}`
 
+      // Return cached result if fresh
+      const cached = torrentioCache.get(path)
+      if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+        return reply.send(cached.data)
+      }
+
       const clientIp = (request.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() || request.ip
 
       console.log('[Torrentio Proxy] Fetching:', url.replace(/realdebrid=[^|/]+/, 'realdebrid=***'))
@@ -433,10 +441,8 @@ export default async function proxyRoutes(server: FastifyInstance) {
 
       const targets = [
         { url, label: 'primary', headers: { 'X-Real-IP': clientIp, 'X-Forwarded-For': clientIp } },
-        { url: `https://cors.isomorphic-git.org/${encodeURIComponent(url)}`, label: 'isomorphic-git' },
-        { url: `https://corsproxy.io/?${encodeURIComponent(url)}`, label: 'corsproxy.io' },
-        { url: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, label: 'allorigins' },
         { url: `https://r.jina.ai/https://torrentio.strem.fun/${path}`, label: 'jina-ai' },
+        { url: `https://corsproxy.io/?${encodeURIComponent(url)}`, label: 'corsproxy.io' },
       ]
 
       let response: Response | null = null
@@ -466,6 +472,11 @@ export default async function proxyRoutes(server: FastifyInstance) {
         console.error('[Torrentio Proxy] Error:', lastStatus || 'unknown', text)
         return reply.status(lastStatus || 502).send({ error: `Torrentio error: ${lastStatus || 502}`, details: text })
       }
+
+      // Cache successful response
+      const data = await response.json()
+      torrentioCache.set(path, { ts: Date.now(), data })
+      return reply.send(data)
 
       if (!response.ok) {
         const text = await response.text()
