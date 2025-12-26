@@ -421,13 +421,14 @@ export default async function proxyRoutes(server: FastifyInstance) {
       // Preserve original encoding so the upstream sees the exact path (pipes, commas, etc.)
       const rawPath = (request.raw.url || '').replace(/^\/api\/proxy\/torrentio\//, '')
       const path = rawPath || request.params['*'] || ''
-      const url = `https://torrentio.strem.fun/${path}`
+      const base = 'https://torrentio.strem.fun/'
+      const url = `${base}${path}`
 
       const clientIp = (request.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() || request.ip
 
       console.log('[Torrentio Proxy] Fetching:', url.replace(/realdebrid=[^|/]+/, 'realdebrid=***'))
 
-      const response = await fetch(url, {
+      let response = await fetch(url, {
         headers: {
           'User-Agent': request.headers['user-agent'] || 'Mozilla/5.0 (Stremio Proxy)',
           'Accept': 'application/json',
@@ -438,6 +439,21 @@ export default async function proxyRoutes(server: FastifyInstance) {
           'X-Forwarded-For': clientIp,
         }
       })
+
+      // Fallback: if Cloudflare blocks our server IP (403), retry through a public CORS proxy with a different egress IP
+      if (response.status === 403) {
+        const fallbackUrl = `https://cors.isomorphic-git.org/${encodeURIComponent(`${base}${path}`)}`
+        console.warn('[Torrentio Proxy] 403 from primary, retrying via fallback proxy')
+        response = await fetch(fallbackUrl, {
+          headers: {
+            'User-Agent': request.headers['user-agent'] || 'Mozilla/5.0 (Stremio Proxy)',
+            'Accept': 'application/json',
+            'Accept-Language': (request.headers['accept-language'] as string) || 'en-US,en;q=0.9',
+            'Referer': 'https://strem.io/',
+            'Origin': 'https://strem.io',
+          }
+        })
+      }
 
       if (!response.ok) {
         const text = await response.text()
