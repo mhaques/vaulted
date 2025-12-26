@@ -218,8 +218,8 @@ export default function Title() {
     } catch (err: any) {
       console.error(`Source failed: ${source.name}`, err)
       
-      // Auto-try next source (up to 5 attempts)
-      const maxAutoRetries = 5
+      // Auto-try next source (up to 10 attempts since we filter bad sources now)
+      const maxAutoRetries = 10
       const nextIndex = attemptIndex + 1
       const currentSourceIndex = allSources.findIndex(s => s.id === source.id)
       const nextSource = allSources[currentSourceIndex + 1]
